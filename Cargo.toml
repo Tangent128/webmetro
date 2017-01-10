@@ -1,0 +1,7 @@
+[package]
+name = "lab_ebml"
+version = "0.1.0"
+authors = ["Tangent 128 <Tangent128@gmail.com>"]
+
+[dependencies]
+futures = "^0.1.7"
