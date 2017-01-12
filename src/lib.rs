@@ -14,7 +14,7 @@ pub enum Varint {
     Unknown
 }
 
-/// Try to parse an EBML varint starting at the start of the given slice.
+/// Try to parse an EBML varint at the start of the given slice.
 /// Returns an Err() if the format is corrupt.
 /// Returns Ok(None) if more bytes are needed to get a result.
 /// Returns Ok(Some((varint, next))) to return a varint value and
