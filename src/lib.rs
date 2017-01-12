@@ -3,7 +3,8 @@ extern crate futures;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    CorruptVarint
+    CorruptVarint,
+    UnknownElementId
 }
 
 #[derive(Debug, PartialEq)]
@@ -63,12 +64,39 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
     }
 }
 
+/// Try to parse an EBML element header at the start of the given slice.
+/// Returns an Err() if the format is corrupt.
+/// Returns Ok(None) if more bytes are needed to get a result.
+/// Returns Ok(Some((id, varint, next))) to return the element id,
+/// the size of the payload, and the size of the parsed varint.
+pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
+    // parse element ID
+    match decode_varint(bytes) {
+        Ok(None) => Ok(None),
+        Err(err) => Err(err),
+        Ok(Some((Varint::Unknown, _))) => Err(Error::UnknownElementId),
+        Ok(Some((Varint::Value(element_id), id_size))) => {
+            // parse payload size
+            match decode_varint(&bytes[id_size..]) {
+                Ok(None) => Ok(None),
+                Err(err) => Err(err),
+                Ok(Some((element_length, length_size))) =>
+                    Ok(Some((
+                        element_id,
+                        element_length,
+                        id_size + length_size
+                    )))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use futures::future::{ok, Future};
-    use super::{decode_varint};
-    use super::Error::{CorruptVarint};
+    use super::*;
+    use super::Error::{CorruptVarint, UnknownElementId};
     use super::Varint::{Unknown, Value};
 
     #[test]
@@ -104,5 +132,29 @@ mod tests {
 
         // test extra data in buffer
         assert_eq!(decode_varint(&[0x83, 0x11]), Ok(Some((Value(3), 1))));
+    }
+
+    #[test]
+    fn fail_corrupted_tags() {
+        assert_eq!(decode_tag(&[0]), Err(CorruptVarint));
+        assert_eq!(decode_tag(&[0x80, 0]), Err(CorruptVarint));
+        assert_eq!(decode_tag(&[0xFF, 0x80]), Err(UnknownElementId));
+        assert_eq!(decode_tag(&[0x7F, 0xFF, 0x40, 0]), Err(UnknownElementId));
+    }
+
+    #[test]
+    fn incomplete_tags() {
+        assert_eq!(decode_tag(&[]), Ok(None));
+        assert_eq!(decode_tag(&[0x80]), Ok(None));
+        assert_eq!(decode_tag(&[0x40, 0, 0x40]), Ok(None));
+    }
+
+    #[test]
+    fn parse_tags() {
+        assert_eq!(decode_tag(&[0x80, 0x80]), Ok(Some((0, Value(0), 2))));
+        assert_eq!(decode_tag(&[0x81, 0x85]), Ok(Some((1, Value(5), 2))));
+        assert_eq!(decode_tag(&[0x80, 0xFF]), Ok(Some((0, Unknown, 2))));
+        assert_eq!(decode_tag(&[0x80, 0x7F, 0xFF]), Ok(Some((0, Unknown, 3))));
+        assert_eq!(decode_tag(&[0x85, 0x40, 52]), Ok(Some((5, Value(52), 3))));
     }
 }
