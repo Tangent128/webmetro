@@ -8,7 +8,9 @@ pub enum Error {
 
 #[derive(Debug, PartialEq)]
 pub enum Varint {
+    /// a numeric value
     Value(u64),
+    /// the reserved "unknown" value
     Unknown
 }
 
@@ -16,7 +18,7 @@ pub enum Varint {
 /// Returns an Err() if the format is corrupt.
 /// Returns Ok(None) if more bytes are needed to get a result.
 /// Returns Ok(Some((varint, next))) to return a varint value and
-/// the starting location fo the next 
+/// the size of the parsed varint.
 pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
     let mut value: u64 = 0;
     let mut value_length = 1;
