@@ -7,7 +7,7 @@ pub enum Error {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum EbmlVarint {
+pub enum Varint {
     Value(u64),
     Unknown
 }
@@ -17,7 +17,7 @@ pub enum EbmlVarint {
 /// Returns Ok(None) if more bytes are needed to get a result.
 /// Returns Ok(Some((varint, next))) to return a varint value and
 /// the starting location fo the next 
-pub fn decode_varint(bytes: &[u8]) -> Result<Option<(EbmlVarint, usize)>, Error> {
+pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
     let mut value: u64 = 0;
     let mut value_length = 1;
     let mut mask: u8 = 0x80;
@@ -55,9 +55,9 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(EbmlVarint, usize)>, Error>
 
     // determine result
     if value == unknown_marker {
-        Ok(Some((EbmlVarint::Unknown, value_length)))
+        Ok(Some((Varint::Unknown, value_length)))
     } else {
-        Ok(Some((EbmlVarint::Value(value), value_length)))
+        Ok(Some((Varint::Value(value), value_length)))
     }
 }
 
@@ -66,7 +66,7 @@ mod tests {
 
     use futures::future::{ok, Future};
     use super::{decode_varint, Error};
-    use super::EbmlVarint::{Unknown, Value};
+    use super::Varint::{Unknown, Value};
 
     #[test]
     fn hello_futures() {
