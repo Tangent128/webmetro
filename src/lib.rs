@@ -67,7 +67,8 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
 mod tests {
 
     use futures::future::{ok, Future};
-    use super::{decode_varint, Error};
+    use super::{decode_varint};
+    use super::Error::{CorruptVarint};
     use super::Varint::{Unknown, Value};
 
     #[test]
@@ -82,8 +83,8 @@ mod tests {
 
     #[test]
     fn fail_corrupted_varints() {
-        assert_eq!(decode_varint(&[0]), Err(Error::CorruptVarint));
-        assert_eq!(decode_varint(&[0, 0, 0]), Err(Error::CorruptVarint));
+        assert_eq!(decode_varint(&[0]), Err(CorruptVarint));
+        assert_eq!(decode_varint(&[0, 0, 0]), Err(CorruptVarint));
     }
 
     #[test]
