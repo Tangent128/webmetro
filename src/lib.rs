@@ -20,7 +20,7 @@ pub enum Varint {
 /// Try to parse an EBML varint at the start of the given slice.
 /// Returns an Err() if the format is corrupt.
 /// Returns Ok(None) if more bytes are needed to get a result.
-/// Returns Ok(Some((varint, next))) to return a varint value and
+/// Returns Ok(Some((varint, size))) to return a varint value and
 /// the size of the parsed varint.
 pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
     let mut value: u64 = 0;
@@ -69,8 +69,8 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
 /// Try to parse an EBML element header at the start of the given slice.
 /// Returns an Err() if the format is corrupt.
 /// Returns Ok(None) if more bytes are needed to get a result.
-/// Returns Ok(Some((id, varint, next))) to return the element id,
-/// the size of the payload, and the size of the parsed varint.
+/// Returns Ok(Some((id, varint, size))) to return the element id,
+/// the size of the payload, and the size of the parsed header.
 pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
     // parse element ID
     match decode_varint(bytes) {
