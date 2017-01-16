@@ -4,7 +4,9 @@ extern crate futures;
 #[derive(Debug, PartialEq)]
 pub enum Error {
     CorruptVarint,
-    UnknownElementId
+    UnknownElementId,
+    UnknownElementLength,
+    CorruptPayload,
 }
 
 #[derive(Debug, PartialEq)]
