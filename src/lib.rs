@@ -93,17 +93,22 @@ pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
     }
 }
 
-pub trait Schema<'a>: Sized {
+pub trait Schema<'a> {
+    type Element;
     fn should_unwrap(element_id: u64) -> bool;
-    fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
+    fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<Self::Element, Error>;
 }
+
+pub struct Webm;
 
 #[derive(Debug, PartialEq)]
 pub enum WebmElement<'a> {
     Unknown(u64, &'a[u8])
 }
 
-impl<'a> Schema<'a> for WebmElement<'a> {
+impl<'a> Schema<'a> for Webm {
+    type Element = WebmElement<'a>;
+
     fn should_unwrap(element_id: u64) -> bool {
         false
     }
@@ -114,12 +119,12 @@ impl<'a> Schema<'a> for WebmElement<'a> {
     }
 }
 
-pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Option<(T, usize)>, Error> {
+pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Option<(T::Element, usize)>, Error> {
     match decode_tag(bytes) {
         Ok(None) => Ok(None),
         Err(err) => Err(err),
         Ok(Some((element_id, payload_size_tag, tag_size))) => {
-            let should_unwrap = <T as Schema>::should_unwrap(element_id);
+            let should_unwrap = T::should_unwrap(element_id);
 
             let payload_size = match (should_unwrap, payload_size_tag) {
                 (true, _) => 0,
@@ -133,7 +138,7 @@ pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Optio
                 return Ok(None);
             }
 
-            match Schema::decode(element_id, &bytes[tag_size..element_size]) {
+            match T::decode(element_id, &bytes[tag_size..element_size]) {
                 Ok(element) => Ok(Some((element, element_size))),
                 Err(error) => Err(error)
             }
@@ -212,7 +217,7 @@ mod tests {
 
     #[test]
     fn decode_sanity_test() {
-        let decoded = decode_element(TEST_FILE);
+        let decoded = decode_element::<Webm>(TEST_FILE);
         if let Ok(Some((WebmElement::Unknown(tag, slice), element_size))) = decoded {
             assert_eq!(tag, 0x0A45DFA3); // EBML tag, sans the length indicator bit
             assert_eq!(slice.len(), 31); // known header payload length
