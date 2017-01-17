@@ -98,6 +98,22 @@ pub trait Schema<'a>: Sized {
     fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
 }
 
+#[derive(Debug, PartialEq)]
+pub enum WebmElement<'a> {
+    Unknown(u64, &'a[u8])
+}
+
+impl<'a> Schema<'a> for WebmElement<'a> {
+    fn should_unwrap(element_id: u64) -> bool {
+        false
+    }
+
+    fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'a>, Error> {
+        // dummy
+        Ok(WebmElement::Unknown(element_id, bytes))
+    }
+}
+
 pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Option<(T, usize)>, Error> {
     match decode_tag(bytes) {
         Ok(None) => Ok(None),
@@ -191,4 +207,19 @@ mod tests {
         assert_eq!(decode_tag(&[0x80, 0x7F, 0xFF]), Ok(Some((0, Unknown, 3))));
         assert_eq!(decode_tag(&[0x85, 0x40, 52]), Ok(Some((5, Value(52), 3))));
     }
+
+    const TEST_FILE: &'static [u8] = include_bytes!("data/test1.webm");
+
+    #[test]
+    fn decode_sanity_test() {
+        let decoded = decode_element(TEST_FILE);
+        if let Ok(Some((WebmElement::Unknown(tag, slice), element_size))) = decoded {
+            assert_eq!(tag, 0x0A45DFA3); // EBML tag, sans the length indicator bit
+            assert_eq!(slice.len(), 31); // known header payload length
+            assert_eq!(element_size, 43); // known header total length
+        } else {
+            panic!("Did not parse expected EBML header; result: {:?}", decoded);
+        }
+    }
+
 }
