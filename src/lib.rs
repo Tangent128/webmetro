@@ -93,6 +93,38 @@ pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
     }
 }
 
+pub trait Schema<'a>: Sized {
+    fn should_unwrap(element_id: u64) -> bool;
+    fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
+}
+
+pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Option<(T, usize)>, Error> {
+    match decode_tag(bytes) {
+        Ok(None) => Ok(None),
+        Err(err) => Err(err),
+        Ok(Some((element_id, payload_size_tag, tag_size))) => {
+            let should_unwrap = <T as Schema>::should_unwrap(element_id);
+
+            let payload_size = match (should_unwrap, payload_size_tag) {
+                (true, _) => 0,
+                (false, Varint::Unknown) => return Err(Error::UnknownElementLength),
+                (false, Varint::Value(size)) => size as usize
+            };
+
+            let element_size = tag_size + payload_size;
+            if element_size > bytes.len() {
+                // need to read more still
+                return Ok(None);
+            }
+
+            match Schema::decode(element_id, &bytes[tag_size..element_size]) {
+                Ok(element) => Ok(Some((element, element_size))),
+                Err(error) => Err(error)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
