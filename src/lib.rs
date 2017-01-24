@@ -94,7 +94,8 @@ pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
 }
 
 pub trait Schema<'a> {
-    type Element;
+    type Element: 'a;
+
     fn should_unwrap(element_id: u64) -> bool;
     fn decode<'b: 'a>(element_id: u64, bytes: &'b[u8]) -> Result<Self::Element, Error>;
 }
@@ -141,6 +142,35 @@ pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Optio
             match T::decode(element_id, &bytes[tag_size..element_size]) {
                 Ok(element) => Ok(Some((element, element_size))),
                 Err(error) => Err(error)
+            }
+        }
+    }
+}
+
+pub struct WebmIterator<'b> {
+    slice: &'b[u8],
+    position: usize,
+}
+
+impl<'b> WebmIterator<'b> {
+    pub fn new(bytes: &'b[u8]) -> Self {
+        WebmIterator {
+            slice: bytes,
+            position: 0
+        }
+    }
+}
+
+impl<'b> Iterator for WebmIterator<'b> {
+    type Item = WebmElement<'b>;
+
+    fn next(&mut self) -> Option<WebmElement<'b>> {
+        match decode_element::<Webm>(&self.slice[self.position..]) {
+            Err(_) => None,
+            Ok(None) => None,
+            Ok(Some((element, element_size))) => {
+                self.position += element_size;
+                Some(element)
             }
         }
     }
@@ -225,6 +255,28 @@ mod tests {
         } else {
             panic!("Did not parse expected EBML header; result: {:?}", decoded);
         }
+    }
+
+    fn assert_webm_blob(test: Option<WebmElement>, tag: u64, payload_size: usize) {
+        match test {
+            Some(WebmElement::Unknown(element_tag, bytes)) => {
+                assert_eq!(element_tag, tag);
+                assert_eq!(bytes.len(), payload_size);
+            },
+            None => {
+                panic!("Did not parse expected WebM element; result: {:?}", test);
+            }
+        }
+    }
+
+    #[test]
+    fn decode_webm_test1() {
+        let mut iter = WebmIterator::new(TEST_FILE);
+        // EBML Header
+        assert_webm_blob(iter.next(), 0x0A45DFA3, 31);
+
+        // Segment
+        assert_webm_blob(iter.next(), 0x08538067, 56124);
     }
 
 }
