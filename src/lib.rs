@@ -147,25 +147,27 @@ pub fn decode_element<'a, 'b: 'a, T: Schema<'a>>(bytes: &'b[u8]) -> Result<Optio
     }
 }
 
-pub struct WebmIterator<'b> {
+pub struct EbmlIterator<'b, T: Schema<'b>> {
+    schema: std::marker::PhantomData<T>,
     slice: &'b[u8],
     position: usize,
 }
 
-impl<'b> WebmIterator<'b> {
+impl<'b, T: Schema<'b>> EbmlIterator<'b, T> {
     pub fn new(bytes: &'b[u8]) -> Self {
-        WebmIterator {
+        EbmlIterator {
+            schema: std::marker::PhantomData,
             slice: bytes,
             position: 0
         }
     }
 }
 
-impl<'b> Iterator for WebmIterator<'b> {
-    type Item = WebmElement<'b>;
+impl<'b, T: Schema<'b>> Iterator for EbmlIterator<'b, T> {
+    type Item = T::Element;
 
-    fn next(&mut self) -> Option<WebmElement<'b>> {
-        match decode_element::<Webm>(&self.slice[self.position..]) {
+    fn next(&mut self) -> Option<T::Element> {
+        match decode_element::<T>(&self.slice[self.position..]) {
             Err(_) => None,
             Ok(None) => None,
             Ok(Some((element, element_size))) => {
@@ -271,7 +273,7 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let mut iter = WebmIterator::new(TEST_FILE);
+        let mut iter = EbmlIterator::<Webm>::new(TEST_FILE);
         // EBML Header
         assert_webm_blob(iter.next(), 0x0A45DFA3, 31);
 
