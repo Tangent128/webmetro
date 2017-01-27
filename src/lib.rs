@@ -140,20 +140,29 @@ pub trait Schema<'a> {
 pub struct Webm;
 
 #[derive(Debug, PartialEq)]
-pub enum WebmElement<'a> {
-    Unknown(u64, &'a[u8])
+pub enum WebmElement {
+    EbmlHead,
+    Segment,
+    Unknown(u64)
 }
 
 impl<'a> Schema<'a> for Webm {
-    type Element = WebmElement<'a>;
+    type Element = WebmElement;
 
     fn should_unwrap(&self, element_id: u64) -> bool {
-        false
+        match element_id {
+            // Segment
+            0x08538067 => true,
+            _ => false
+        }
     }
 
-    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'a>, Error> {
-        // dummy
-        Ok(WebmElement::Unknown(element_id, bytes))
+    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement, Error> {
+        match element_id {
+            0x0A45DFA3 => Ok(WebmElement::EbmlHead),
+            0x08538067 => Ok(WebmElement::Segment),
+            _ => Ok(WebmElement::Unknown(element_id))
+        }
     }
 }
 
@@ -274,26 +283,17 @@ mod tests {
         assert_eq!(decoded, Ok(Some((GenericElement(0x0A45DFA3, 31), 43))));
     }
 
-    fn assert_webm_blob(test: Option<WebmElement>, tag: u64, payload_size: usize) {
-        match test {
-            Some(WebmElement::Unknown(element_tag, bytes)) => {
-                assert_eq!(element_tag, tag);
-                assert_eq!(bytes.len(), payload_size);
-            },
-            None => {
-                panic!("Did not parse expected WebM element; result: {:?}", test);
-            }
-        }
-    }
-
     #[test]
     fn decode_webm_test1() {
         let mut iter = Webm.iter_for(TEST_FILE);
         // EBML Header
-        assert_webm_blob(iter.next(), 0x0A45DFA3, 31);
+        assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
 
         // Segment
-        assert_webm_blob(iter.next(), 0x08538067, 56124);
+        assert_eq!(iter.next(), Some(WebmElement::Segment));
+
+        // SeekHead
+        assert_eq!(iter.next(), Some(WebmElement::Unknown(0x014D9B74)));
     }
 
 }
