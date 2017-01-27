@@ -247,16 +247,31 @@ mod tests {
 
     const TEST_FILE: &'static [u8] = include_bytes!("data/test1.webm");
 
+    struct Dummy;
+
+    #[derive(Debug, PartialEq)]
+    struct GenericElement(u64, usize);
+
+    impl<'a> Schema<'a> for Dummy {
+        type Element = GenericElement;
+
+        fn should_unwrap(&self, element_id: u64) -> bool {
+            match element_id {
+                _ => false
+            }
+        }
+
+        fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<GenericElement, Error> {
+            match element_id {
+                _ => Ok(GenericElement(element_id, bytes.len()))
+            }
+        }
+    }
+
     #[test]
     fn decode_sanity_test() {
-        let decoded = Webm.decode_element(TEST_FILE);
-        if let Ok(Some((WebmElement::Unknown(tag, slice), element_size))) = decoded {
-            assert_eq!(tag, 0x0A45DFA3); // EBML tag, sans the length indicator bit
-            assert_eq!(slice.len(), 31); // known header payload length
-            assert_eq!(element_size, 43); // known header total length
-        } else {
-            panic!("Did not parse expected EBML header; result: {:?}", decoded);
-        }
+        let decoded = Dummy.decode_element(TEST_FILE);
+        assert_eq!(decoded, Ok(Some((GenericElement(0x0A45DFA3, 31), 43))));
     }
 
     fn assert_webm_blob(test: Option<WebmElement>, tag: u64, payload_size: usize) {
