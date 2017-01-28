@@ -126,12 +126,19 @@ pub trait Schema<'a> {
         }
     }
 
-    fn iter_for<'b: 'a>(self, bytes: &'b[u8]) -> EbmlIterator<'a, Self>
-    where Self: Sized
+}
+
+pub struct Ebml<'b, S: Schema<'b>>(S, &'b[u8]);
+
+impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S> {
+    type Item = S::Element;
+    type IntoIter = EbmlIterator<'b, S>;
+
+    fn into_iter(self) -> EbmlIterator<'b, S>
     {
         EbmlIterator {
-            schema: self,
-            slice: bytes,
+            schema: self.0,
+            slice: self.1,
             position: 0
         }
     }
@@ -285,7 +292,7 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let mut iter = Webm.iter_for(TEST_FILE);
+        let mut iter = Ebml(Webm, TEST_FILE).into_iter();
         // EBML Header
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
 
