@@ -148,14 +148,16 @@ impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S, &'b[u8]> {
 pub struct Webm;
 
 #[derive(Debug, PartialEq)]
-pub enum WebmElement {
+pub enum WebmElement<'b> {
     EbmlHead,
     Segment,
+    SeekHead,
+    Cluster(&'b[u8]),
     Unknown(u64)
 }
 
 impl<'a> Schema<'a> for Webm {
-    type Element = WebmElement;
+    type Element = WebmElement<'a>;
 
     fn should_unwrap(&self, element_id: u64) -> bool {
         match element_id {
@@ -165,10 +167,12 @@ impl<'a> Schema<'a> for Webm {
         }
     }
 
-    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement, Error> {
+    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, Error> {
         match element_id {
             0x0A45DFA3 => Ok(WebmElement::EbmlHead),
             0x08538067 => Ok(WebmElement::Segment),
+            0x014D9B74 => Ok(WebmElement::SeekHead),
+            0x0F43B675 => Ok(WebmElement::Cluster(bytes)),
             _ => Ok(WebmElement::Unknown(element_id))
         }
     }
@@ -293,7 +297,8 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let mut iter = Ebml(Webm, TEST_FILE).into_iter();
+        let source = &TEST_FILE;
+        let mut iter = Ebml(Webm, source).into_iter();
         // EBML Header
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
 
@@ -301,7 +306,7 @@ mod tests {
         assert_eq!(iter.next(), Some(WebmElement::Segment));
 
         // SeekHead
-        assert_eq!(iter.next(), Some(WebmElement::Unknown(0x014D9B74)));
+        assert_eq!(iter.next(), Some(WebmElement::SeekHead));
     }
 
 }
