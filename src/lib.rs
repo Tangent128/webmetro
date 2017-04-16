@@ -128,9 +128,10 @@ pub trait Schema<'a> {
 
 }
 
-pub struct Ebml<'b, S: Schema<'b>>(S, &'b[u8]);
+#[derive(Debug, PartialEq)]
+pub struct Ebml<'b, S: Schema<'b>, T: 'b>(S, &'b T);
 
-impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S> {
+impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S, &'b[u8]> {
     type Item = S::Element;
     type IntoIter = EbmlIterator<'b, S>;
 
