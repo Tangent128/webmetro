@@ -126,15 +126,19 @@ pub trait Schema<'a> {
         }
     }
 
+    fn parse<T>(self, source: T) -> Ebml<Self, T> where Self: Sized {
+        Ebml(self, source)
+    }
+
 }
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const VOID_ID: u64 = 0x6C;
 
 #[derive(Debug, PartialEq)]
-pub struct Ebml<'b, S: Schema<'b>, T: 'b>(S, &'b T);
+pub struct Ebml<S, T>(S, T);
 
-impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S, &'b[u8]> {
+impl<'b, S: Schema<'b>> IntoIterator for Ebml<S, &'b[u8]> {
     type Item = S::Element;
     type IntoIter = EbmlIterator<'b, S>;
 
@@ -314,8 +318,7 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let source = &TEST_FILE;
-        let mut iter = Ebml(Webm, source).into_iter();
+        let mut iter = Webm.parse(TEST_FILE).into_iter();
 
         // test that we match the structure of the test file
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
