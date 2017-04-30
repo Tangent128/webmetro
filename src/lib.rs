@@ -128,6 +128,9 @@ pub trait Schema<'a> {
 
 }
 
+pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
+pub const VOID_ID: u64 = 0x6C;
+
 #[derive(Debug, PartialEq)]
 pub struct Ebml<'b, S: Schema<'b>, T: 'b>(S, &'b T);
 
@@ -145,13 +148,23 @@ impl<'b, S: Schema<'b>> IntoIterator for Ebml<'b, S, &'b[u8]> {
     }
 }
 
+const SEGMENT_ID: u64 = 0x08538067;
+const SEEK_HEAD_ID: u64 = 0x014D9B74;
+const SEGMENT_INFO_ID: u64 = 0x0549A966;
+const CUES_ID: u64 = 0x0C53BB6B;
+const TRACKS_ID: u64 = 0x0654AE6B;
+const CLUSTER_ID: u64 = 0x0F43B675;
 pub struct Webm;
 
 #[derive(Debug, PartialEq)]
 pub enum WebmElement<'b> {
     EbmlHead,
+    Void,
     Segment,
     SeekHead,
+    Info,
+    Cues,
+    Tracks(&'b[u8]),
     Cluster(&'b[u8]),
     Unknown(u64)
 }
@@ -162,17 +175,21 @@ impl<'a> Schema<'a> for Webm {
     fn should_unwrap(&self, element_id: u64) -> bool {
         match element_id {
             // Segment
-            0x08538067 => true,
+            SEGMENT_ID => true,
             _ => false
         }
     }
 
     fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, Error> {
         match element_id {
-            0x0A45DFA3 => Ok(WebmElement::EbmlHead),
-            0x08538067 => Ok(WebmElement::Segment),
-            0x014D9B74 => Ok(WebmElement::SeekHead),
-            0x0F43B675 => Ok(WebmElement::Cluster(bytes)),
+            EBML_HEAD_ID => Ok(WebmElement::EbmlHead),
+            VOID_ID => Ok(WebmElement::Void),
+            SEGMENT_ID => Ok(WebmElement::Segment),
+            SEEK_HEAD_ID => Ok(WebmElement::SeekHead),
+            SEGMENT_INFO_ID => Ok(WebmElement::Info),
+            CUES_ID => Ok(WebmElement::Cues),
+            TRACKS_ID => Ok(WebmElement::Tracks(bytes)),
+            CLUSTER_ID => Ok(WebmElement::Cluster(bytes)),
             _ => Ok(WebmElement::Unknown(element_id))
         }
     }
@@ -299,14 +316,19 @@ mod tests {
     fn decode_webm_test1() {
         let source = &TEST_FILE;
         let mut iter = Ebml(Webm, source).into_iter();
-        // EBML Header
+
+        // test that we match the structure of the test file
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
-
-        // Segment
         assert_eq!(iter.next(), Some(WebmElement::Segment));
-
-        // SeekHead
         assert_eq!(iter.next(), Some(WebmElement::SeekHead));
+        assert_eq!(iter.next(), Some(WebmElement::Void));
+        assert_eq!(iter.next(), Some(WebmElement::Info));
+        assert_eq!(iter.next(), Some(WebmElement::Tracks(&TEST_FILE[358..421])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[433..13739])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[13751..34814])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[34826..56114])));
+        assert_eq!(iter.next(), Some(WebmElement::Cues));
+        assert_eq!(iter.next(), None);
     }
 
 }
