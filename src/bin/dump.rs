@@ -4,8 +4,9 @@ use std::env::args;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use lab_ebml::{Schema, Webm};
-use lab_ebml::WebmElement::*;
+use lab_ebml::Schema;
+use lab_ebml::webm::Webm;
+use lab_ebml::webm::WebmElement::*;
 
 pub fn main() {
     let mut args = args();
