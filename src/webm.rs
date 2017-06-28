@@ -46,3 +46,27 @@ impl<'a> Schema<'a> for Webm {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tests::TEST_FILE;
+    use webm::*;
+
+    #[test]
+    fn decode_webm_test1() {
+        let mut iter = Webm.parse(TEST_FILE).into_iter();
+
+        // test that we match the structure of the test file
+        assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
+        assert_eq!(iter.next(), Some(WebmElement::Segment));
+        assert_eq!(iter.next(), Some(WebmElement::SeekHead));
+        assert_eq!(iter.next(), Some(WebmElement::Void));
+        assert_eq!(iter.next(), Some(WebmElement::Info));
+        assert_eq!(iter.next(), Some(WebmElement::Tracks(&TEST_FILE[358..421])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[433..13739])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[13751..34814])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[34826..56114])));
+        assert_eq!(iter.next(), Some(WebmElement::Cues));
+        assert_eq!(iter.next(), None);
+    }
+}

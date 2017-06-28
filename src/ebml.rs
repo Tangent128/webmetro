@@ -133,3 +133,87 @@ pub trait Schema<'a> {
         Ebml(self, source)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ebml::*;
+    use ebml::Error::{CorruptVarint, UnknownElementId};
+    use ebml::Varint::{Unknown, Value};
+    use tests::TEST_FILE;
+
+    #[test]
+    fn fail_corrupted_varints() {
+        assert_eq!(decode_varint(&[0]), Err(CorruptVarint));
+        assert_eq!(decode_varint(&[0, 0, 0]), Err(CorruptVarint));
+    }
+
+    #[test]
+    fn incomplete_varints() {
+        assert_eq!(decode_varint(&[]), Ok(None));
+        assert_eq!(decode_varint(&[0x40]), Ok(None));
+        assert_eq!(decode_varint(&[0x01, 0, 0]), Ok(None));
+    }
+
+    #[test]
+    fn parse_varints() {
+        assert_eq!(decode_varint(&[0xFF]), Ok(Some((Unknown, 1))));
+        assert_eq!(decode_varint(&[0x7F, 0xFF]), Ok(Some((Unknown, 2))));
+        assert_eq!(decode_varint(&[0x80]), Ok(Some((Value(0), 1))));
+        assert_eq!(decode_varint(&[0x81]), Ok(Some((Value(1), 1))));
+        assert_eq!(decode_varint(&[0x40, 52]), Ok(Some((Value(52), 2))));
+
+        // test extra data in buffer
+        assert_eq!(decode_varint(&[0x83, 0x11]), Ok(Some((Value(3), 1))));
+    }
+
+    #[test]
+    fn fail_corrupted_tags() {
+        assert_eq!(decode_tag(&[0]), Err(CorruptVarint));
+        assert_eq!(decode_tag(&[0x80, 0]), Err(CorruptVarint));
+        assert_eq!(decode_tag(&[0xFF, 0x80]), Err(UnknownElementId));
+        assert_eq!(decode_tag(&[0x7F, 0xFF, 0x40, 0]), Err(UnknownElementId));
+    }
+
+    #[test]
+    fn incomplete_tags() {
+        assert_eq!(decode_tag(&[]), Ok(None));
+        assert_eq!(decode_tag(&[0x80]), Ok(None));
+        assert_eq!(decode_tag(&[0x40, 0, 0x40]), Ok(None));
+    }
+
+    #[test]
+    fn parse_tags() {
+        assert_eq!(decode_tag(&[0x80, 0x80]), Ok(Some((0, Value(0), 2))));
+        assert_eq!(decode_tag(&[0x81, 0x85]), Ok(Some((1, Value(5), 2))));
+        assert_eq!(decode_tag(&[0x80, 0xFF]), Ok(Some((0, Unknown, 2))));
+        assert_eq!(decode_tag(&[0x80, 0x7F, 0xFF]), Ok(Some((0, Unknown, 3))));
+        assert_eq!(decode_tag(&[0x85, 0x40, 52]), Ok(Some((5, Value(52), 3))));
+    }
+
+    struct Dummy;
+
+    #[derive(Debug, PartialEq)]
+    struct GenericElement(u64, usize);
+
+    impl<'a> Schema<'a> for Dummy {
+        type Element = GenericElement;
+
+        fn should_unwrap(&self, element_id: u64) -> bool {
+            match element_id {
+                _ => false
+            }
+        }
+
+        fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<GenericElement, Error> {
+            match element_id {
+                _ => Ok(GenericElement(element_id, bytes.len()))
+            }
+        }
+    }
+
+    #[test]
+    fn decode_sanity_test() {
+        let decoded = Dummy.decode_element(TEST_FILE);
+        assert_eq!(decoded, Ok(Some((GenericElement(0x0A45DFA3, 31), 43))));
+    }
+}
