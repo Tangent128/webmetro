@@ -93,6 +93,18 @@ pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
     }
 }
 
+pub fn decode_uint(bytes: &[u8]) -> Result<u64, Error> {
+    if bytes.len() < 1 || bytes.len() > 8 {
+        return Err(Error::CorruptPayload);
+    }
+
+    let mut value: u64 = 0;
+    for byte in bytes {
+        value = (value << 8) + (*byte as u64);
+    }
+    Ok(value)
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Ebml<S, T>(pub S, pub T);
 
@@ -188,6 +200,25 @@ mod tests {
         assert_eq!(decode_tag(&[0x80, 0xFF]), Ok(Some((0, Unknown, 2))));
         assert_eq!(decode_tag(&[0x80, 0x7F, 0xFF]), Ok(Some((0, Unknown, 3))));
         assert_eq!(decode_tag(&[0x85, 0x40, 52]), Ok(Some((5, Value(52), 3))));
+    }
+
+    #[test]
+    fn bad_uints() {
+        assert_eq!(decode_uint(&[]), Err(Error::CorruptPayload));
+        assert_eq!(decode_uint(&[0; 9]), Err(Error::CorruptPayload));
+    }
+
+    #[test]
+    fn parse_uints() {
+        assert_eq!(decode_uint(&[0]), Ok(0));
+        assert_eq!(decode_uint(&[0; 8]), Ok(0));
+        assert_eq!(decode_uint(&[1]), Ok(1));
+        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,1]), Ok(1));
+        assert_eq!(decode_uint(&[38]), Ok(38));
+        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,38]), Ok(38));
+        assert_eq!(decode_uint(&[0x7F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]), Ok(9223372036854775807));
+        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,0]), Ok(9223372036854775808));
+        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,1]), Ok(9223372036854775809));
     }
 
     struct Dummy;
