@@ -6,6 +6,8 @@ const SEGMENT_INFO_ID: u64 = 0x0549A966;
 const CUES_ID: u64 = 0x0C53BB6B;
 const TRACKS_ID: u64 = 0x0654AE6B;
 const CLUSTER_ID: u64 = 0x0F43B675;
+const TIMECODE_ID: u64 = 0x67;
+const SIMPLE_BLOCK_ID: u64 = 0x23;
 pub struct Webm;
 
 #[derive(Debug, PartialEq)]
@@ -17,7 +19,9 @@ pub enum WebmElement<'b> {
     Info,
     Cues,
     Tracks(&'b[u8]),
-    Cluster(&'b[u8]),
+    Cluster,
+    Timecode(u64),
+    SimpleBlock(&'b[u8]),
     Unknown(u64)
 }
 
@@ -28,6 +32,7 @@ impl<'a> Schema<'a> for Webm {
         match element_id {
             // Segment
             SEGMENT_ID => true,
+            CLUSTER_ID => true,
             _ => false
         }
     }
@@ -41,7 +46,9 @@ impl<'a> Schema<'a> for Webm {
             SEGMENT_INFO_ID => Ok(WebmElement::Info),
             CUES_ID => Ok(WebmElement::Cues),
             TRACKS_ID => Ok(WebmElement::Tracks(bytes)),
-            CLUSTER_ID => Ok(WebmElement::Cluster(bytes)),
+            CLUSTER_ID => Ok(WebmElement::Cluster),
+            TIMECODE_ID => Ok(WebmElement::Timecode(0)),
+            SIMPLE_BLOCK_ID => Ok(WebmElement::SimpleBlock(bytes)),
             _ => Ok(WebmElement::Unknown(element_id))
         }
     }
@@ -63,9 +70,9 @@ mod tests {
         assert_eq!(iter.next(), Some(WebmElement::Void));
         assert_eq!(iter.next(), Some(WebmElement::Info));
         assert_eq!(iter.next(), Some(WebmElement::Tracks(&TEST_FILE[358..421])));
-        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[433..13739])));
-        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[13751..34814])));
-        assert_eq!(iter.next(), Some(WebmElement::Cluster(&TEST_FILE[34826..56114])));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster));
+        assert_eq!(iter.next(), Some(WebmElement::Cluster));
         assert_eq!(iter.next(), Some(WebmElement::Cues));
         assert_eq!(iter.next(), None);
     }
