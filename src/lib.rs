@@ -1,4 +1,5 @@
 
+extern crate byteorder;
 extern crate futures;
 
 pub mod ebml;

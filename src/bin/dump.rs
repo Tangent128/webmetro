@@ -22,7 +22,7 @@ pub fn main() {
         match element {
             // suppress printing byte arrays
             Tracks(slice) => println!("Tracks[{}]", slice.len()),
-            Cluster(slice) => println!("Cluster[{}]", slice.len()),
+            SimpleBlock{timecode, ..} => println!("SimpleBlock@{}", timecode),
             other => println!("{:?}", other)
         }
     }

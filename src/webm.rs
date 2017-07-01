@@ -1,3 +1,4 @@
+use byteorder::{BigEndian, ByteOrder};
 use ebml::*;
 
 const SEGMENT_ID: u64 = 0x08538067;
@@ -21,7 +22,12 @@ pub enum WebmElement<'b> {
     Tracks(&'b[u8]),
     Cluster,
     Timecode(u64),
-    SimpleBlock(&'b[u8]),
+    SimpleBlock {
+        track: u64,
+        timecode: i16,
+        flags: u8,
+        data: &'b[u8]
+    },
     Unknown(u64)
 }
 
@@ -47,10 +53,29 @@ impl<'a> Schema<'a> for Webm {
             CUES_ID => Ok(WebmElement::Cues),
             TRACKS_ID => Ok(WebmElement::Tracks(bytes)),
             CLUSTER_ID => Ok(WebmElement::Cluster),
-            TIMECODE_ID => Ok(WebmElement::Timecode(0)),
-            SIMPLE_BLOCK_ID => Ok(WebmElement::SimpleBlock(bytes)),
+            TIMECODE_ID => decode_uint(bytes).map(WebmElement::Timecode),
+            SIMPLE_BLOCK_ID => decode_simple_block(bytes),
             _ => Ok(WebmElement::Unknown(element_id))
         }
+    }
+}
+
+fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
+    if let Ok(Some((Varint::Value(track), track_field_len))) = decode_varint(bytes) {
+        let header_len = track_field_len + 2 + 1;
+        if bytes.len() < header_len {
+            return Err(Error::CorruptPayload);
+        }
+        let timecode = BigEndian::read_i16(&bytes[track_field_len..]);
+        let flags = bytes[track_field_len + 2];
+        return Ok(WebmElement::SimpleBlock {
+            track: track,
+            timecode: timecode,
+            flags: flags,
+            data: &bytes[header_len..],
+        })
+    } else {
+        return Err(Error::CorruptPayload);
     }
 }
 
