@@ -95,9 +95,46 @@ mod tests {
         assert_eq!(iter.next(), Some(WebmElement::Void));
         assert_eq!(iter.next(), Some(WebmElement::Info));
         assert_eq!(iter.next(), Some(WebmElement::Tracks(&TEST_FILE[358..421])));
+
         assert_eq!(iter.next(), Some(WebmElement::Cluster));
+        assert_eq!(iter.next(), Some(WebmElement::Timecode(0)));
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+            track: 1,
+            timecode: 0,
+            flags: 0b10000000,
+            data: &TEST_FILE[443..3683]
+        }));
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+            track: 1,
+            timecode: 33,
+            flags: 0b00000000,
+            data: &TEST_FILE[3690..4735]
+        }));
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+            track: 1,
+            timecode: 67,
+            flags: 0b00000000,
+            data: &TEST_FILE[4741..4801]
+        }));
+        for _ in 3..30 {
+            // skip remaining contents for brevity
+            iter.next();
+        }
+
         assert_eq!(iter.next(), Some(WebmElement::Cluster));
+        assert_eq!(iter.next(), Some(WebmElement::Timecode(1000)));
+        for _ in 0..30 {
+            // skip contents for brevity
+            iter.next();
+        }
+
         assert_eq!(iter.next(), Some(WebmElement::Cluster));
+        assert_eq!(iter.next(), Some(WebmElement::Timecode(2000)));
+        for _ in 0..30 {
+            // skip contents for brevity
+            iter.next();
+        }
+
         assert_eq!(iter.next(), Some(WebmElement::Cues));
         assert_eq!(iter.next(), None);
     }
