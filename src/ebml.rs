@@ -1,3 +1,5 @@
+use byteorder::{BigEndian, ByteOrder};
+
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const VOID_ID: u64 = 0x6C;
 
@@ -98,9 +100,7 @@ pub fn decode_uint(bytes: &[u8]) -> Result<u64, Error> {
         return Err(Error::CorruptPayload);
     }
 
-    let mut value: u64 = 0;
-    for byte in bytes {
-        value = (value << 8) + (*byte as u64);
+    Ok(BigEndian::read_uint(bytes, bytes.len()))
     }
     Ok(value)
 }
