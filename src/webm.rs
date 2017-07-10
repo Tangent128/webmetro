@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder};
+use bytes::{BigEndian, ByteOrder};
 use ebml::*;
 
 const SEGMENT_ID: u64 = 0x08538067;

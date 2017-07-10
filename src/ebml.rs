@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder};
+use bytes::{BigEndian, ByteOrder};
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const VOID_ID: u64 = 0x6C;

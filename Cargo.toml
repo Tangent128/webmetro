@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Tangent 128 <Tangent128@gmail.com>"]
 
 [dependencies]
-byteorder = "1"
+bytes = "0.4"
 futures = "^0.1.7"
