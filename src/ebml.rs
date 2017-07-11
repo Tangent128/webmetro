@@ -1,4 +1,4 @@
-use bytes::{BigEndian, ByteOrder};
+use bytes::{BigEndian, ByteOrder, BufMut};
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const VOID_ID: u64 = 0x6C;
@@ -114,7 +114,7 @@ const EIGHT_FLAG: u64 = 0x01 << (8*7);
 const EIGHT_MAX: u64 = EIGHT_FLAG - 2;
 
 /// Tries to write an EBML varint to the buffer
-pub fn encode_varint(varint: Varint, buffer: &mut [u8]) -> Result<usize, WriteError> {
+pub fn encode_varint<T: BufMut>(varint: Varint, buffer: &mut T) -> Result<usize, WriteError> {
     let (size, number) = match varint {
         Varint::Unknown => (1, 0xFF),
         Varint::Value(too_big) if too_big > EIGHT_MAX => {
@@ -135,10 +135,10 @@ pub fn encode_varint(varint: Varint, buffer: &mut [u8]) -> Result<usize, WriteEr
         }
     };
 
-    if buffer.len() < size {
+    if buffer.remaining_mut() < size {
         Err(WriteError::BufferTooSmall)
     } else {
-        BigEndian::write_uint(buffer, number, size);
+        buffer.put_uint::<BigEndian>(number, size);
         Ok(size)
     }
 }
@@ -186,9 +186,11 @@ pub trait Schema<'a> {
 
 #[cfg(test)]
 mod tests {
+    use bytes::{BytesMut, Buf};
     use ebml::*;
     use ebml::Error::{CorruptVarint, UnknownElementId};
     use ebml::Varint::{Unknown, Value};
+    use std::io::Cursor;
     use tests::TEST_FILE;
 
     #[test]
@@ -218,58 +220,66 @@ mod tests {
 
     #[test]
     fn encode_varints() {
-        let mut buffer = [0; 10];
-        let mut no_space = [0; 0];
+        let mut buffer = BytesMut::with_capacity(10);
+
+        let mut no_space = Cursor::new([0; 0]);
+        assert_eq!(no_space.remaining_mut(), 0);
+
+        let mut six_buffer = Cursor::new([0; 6]);
+        assert_eq!(six_buffer.remaining_mut(), 6);
 
         // 1 byte
         assert_eq!(encode_varint(Varint::Unknown, &mut buffer), Ok(1));
-        assert_eq!(buffer[0], 0xFF);
+        assert_eq!(buffer.split_to(1), &[0xFF].as_ref());
         assert_eq!(encode_varint(Varint::Unknown, &mut no_space), Err(WriteError::BufferTooSmall));
 
         assert_eq!(encode_varint(Varint::Value(0), &mut buffer), Ok(1));
-        assert_eq!(buffer[0], 0x80 | 0);
+        assert_eq!(buffer.split_to(1), &[0x80 | 0].as_ref());
         assert_eq!(encode_varint(Varint::Value(0), &mut no_space), Err(WriteError::BufferTooSmall));
 
         assert_eq!(encode_varint(Varint::Value(1), &mut buffer), Ok(1));
-        assert_eq!(buffer[0], 0x80 | 1);
+        assert_eq!(buffer.split_to(1), &[0x80 | 1].as_ref());
         assert_eq!(encode_varint(Varint::Value(1), &mut no_space), Err(WriteError::BufferTooSmall));
 
         assert_eq!(encode_varint(Varint::Value(126), &mut buffer), Ok(1));
-        assert_eq!(buffer[0], 0xF0 | 126);
+        assert_eq!(buffer.split_to(1), &[0xF0 | 126].as_ref());
         assert_eq!(encode_varint(Varint::Value(126), &mut no_space), Err(WriteError::BufferTooSmall));
 
         // 2 bytes
         assert_eq!(encode_varint(Varint::Value(127), &mut buffer), Ok(2));
-        assert_eq!(&buffer[0..2], &[0x40, 127]);
+        assert_eq!(&buffer.split_to(2), &[0x40, 127].as_ref());
         assert_eq!(encode_varint(Varint::Value(127), &mut no_space), Err(WriteError::BufferTooSmall));
 
         assert_eq!(encode_varint(Varint::Value(128), &mut buffer), Ok(2));
-        assert_eq!(&buffer[0..2], &[0x40, 128]);
+        assert_eq!(&buffer.split_to(2), &[0x40, 128].as_ref());
         assert_eq!(encode_varint(Varint::Value(128), &mut no_space), Err(WriteError::BufferTooSmall));
 
         // 6 bytes
-        assert_eq!(encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut buffer), Ok(6));
-        assert_eq!(&buffer[0..6], &[0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]);
+        assert_eq!(six_buffer.remaining_mut(), 6);
+        assert_eq!(encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut six_buffer), Ok(6));
+        assert_eq!(six_buffer.remaining_mut(), 0);
+        assert_eq!(&six_buffer.get_ref(), &[0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
+        six_buffer = Cursor::new([0; 6]);
 
         // 7 bytes
         assert_eq!(encode_varint(Varint::Value(0x03FFFFFFFFFF), &mut buffer), Ok(7));
-        assert_eq!(&buffer[0..7], &[0x02, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        assert_eq!(&buffer.split_to(7), &[0x02, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0x01000000000000), &mut buffer), Ok(7));
-        assert_eq!(&buffer[0..7], &[0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(&buffer.split_to(7), &[0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut buffer), Ok(7));
-        assert_eq!(&buffer[0..7], &[0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]);
+        assert_eq!(&buffer.split_to(7), &[0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut no_space), Err(WriteError::BufferTooSmall));
-        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut buffer[0..6]), Err(WriteError::BufferTooSmall));
+        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut six_buffer), Err(WriteError::BufferTooSmall));
 
         // 8 bytes
         assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFF), &mut buffer), Ok(8));
-        assert_eq!(&buffer[0..8], &[0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        assert_eq!(&buffer.split_to(8), &[0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0xFFFFFFFFFFFFFE), &mut buffer), Ok(8));
-        assert_eq!(&buffer[0..8], &[0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]);
+        assert_eq!(&buffer.split_to(8), &[0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0xFFFFFFFFFFFFFF), &mut buffer), Err(WriteError::OutOfRange));
         assert_eq!(encode_varint(Varint::Value(u64::max_value()), &mut buffer), Err(WriteError::OutOfRange));
