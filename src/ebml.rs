@@ -157,6 +157,19 @@ pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<usize
     return output.write_all(&buffer.get_ref()[..size]).map(|()| size);
 }
 
+pub fn encode_tag_header<T: Write>(tag: u64, size: Varint, output: &mut T) -> IoResult<usize> {
+    let id_size = encode_varint(Varint::Value(tag), output)?;
+    let size_size = encode_varint(size, output)?;
+    Ok(id_size + size_size)
+}
+
+/// Tries to write a simple EBML tag with a string value
+pub fn encode_string<T: Write>(tag: u64, string: &str, output: &mut T) -> IoResult<usize> {
+    let tag_size = encode_tag_header(tag, Varint::Value(string.len() as u64), output)?;
+    let string_size = output.write_all(string.as_ref()).map(|()| string.len())?;
+    Ok(tag_size + string_size)
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Ebml<S, T>(pub S, pub T);
 
