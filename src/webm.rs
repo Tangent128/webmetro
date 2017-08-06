@@ -1,3 +1,4 @@
+use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
 use bytes::{BigEndian, ByteOrder};
 use ebml::*;
 
@@ -76,6 +77,18 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
         })
     } else {
         return Err(Error::CorruptPayload);
+    }
+}
+
+pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
+    let mut start = 0;
+    match element {
+        WebmElement::EbmlHead => {
+            encode_element(EBML_HEAD_ID, output, |output| {
+                encode_string(DOC_TYPE_ID, "webm", output)
+            })
+        }
+        _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
 }
 

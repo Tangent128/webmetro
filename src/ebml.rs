@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
+pub const DOC_TYPE_ID: u64 = 0x0282;
 pub const VOID_ID: u64 = 0x6C;
 
 #[derive(Debug, PartialEq)]
