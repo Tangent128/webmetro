@@ -202,6 +202,15 @@ pub fn encode_string<T: Write>(tag: u64, string: &str, output: &mut T) -> IoResu
     encode_tag_header(tag, Varint::Value(string.len() as u64), output)?;
     output.write_all(string.as_ref())
 }
+
+/// Tries to write a simple EBML tag with an integer value
+pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResult<()> {
+    encode_tag_header(tag, Varint::Value(8), output)?;
+
+    let mut buffer = Cursor::new([0; 8]);
+    buffer.put_u64::<BigEndian>(value);
+
+    output.write_all(&buffer.get_ref()[..])
 }
 
 #[derive(Debug, PartialEq)]

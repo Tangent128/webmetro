@@ -10,6 +10,10 @@ pub fn main() {
     encode_webm_element(WebmElement::Segment, &mut cursor).unwrap();
 
     encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
+    encode_webm_element(WebmElement::Timecode(0), &mut cursor).unwrap();
+
+    encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
+    encode_webm_element(WebmElement::Timecode(1000), &mut cursor).unwrap();
 
     stdout().write_all(&cursor.get_ref()).unwrap();
 }
