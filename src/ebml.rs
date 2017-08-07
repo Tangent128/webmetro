@@ -131,7 +131,7 @@ const EIGHT_FLAG: u64 = 0x01 << (8*7);
 const EIGHT_MAX: u64 = EIGHT_FLAG - 2;
 
 /// Tries to write an EBML varint using minimal space
-pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<usize> {
+pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<()> {
     let (size, number) = match varint {
         Varint::Unknown => (1, 0xFF),
         Varint::Value(too_big) if too_big > EIGHT_MAX => {
@@ -155,14 +155,14 @@ pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<usize
     let mut buffer = Cursor::new([0; 8]);
     buffer.put_uint::<BigEndian>(number, size);
 
-    return output.write_all(&buffer.get_ref()[..size]).map(|()| size);
+    return output.write_all(&buffer.get_ref()[..size]);
 }
 
 const FOUR_FLAG: u64 = 0x10 << (8*3);
 const FOUR_MAX: u64 = FOUR_FLAG - 2;
 
 // tries to write a varint with a fixed 4-byte representation
-pub fn encode_varint_4<T: Write>(varint: Varint, output: &mut T) -> IoResult<usize> {
+pub fn encode_varint_4<T: Write>(varint: Varint, output: &mut T) -> IoResult<()> {
     let number = match varint {
         Varint::Unknown => FOUR_FLAG | (FOUR_FLAG - 1),
         Varint::Value(too_big) if too_big > FOUR_MAX => {
@@ -174,7 +174,7 @@ pub fn encode_varint_4<T: Write>(varint: Varint, output: &mut T) -> IoResult<usi
     let mut buffer = Cursor::new([0; 4]);
     buffer.put_u32::<BigEndian>(number as u32);
 
-    return output.write_all(&buffer.get_ref()[..]).map(|()| 4);
+    output.write_all(&buffer.get_ref()[..])
 }
 
 pub fn encode_element<T: Write + Seek, F: Fn(&mut T) -> IoResult<X>, X>(tag: u64, output: &mut T, content: F) -> IoResult<()> {
@@ -194,15 +194,14 @@ pub fn encode_element<T: Write + Seek, F: Fn(&mut T) -> IoResult<X>, X>(tag: u64
 
 pub fn encode_tag_header<T: Write>(tag: u64, size: Varint, output: &mut T) -> IoResult<()> {
     encode_varint(Varint::Value(tag), output)?;
-    encode_varint(size, output)?;
-    Ok(())
+    encode_varint(size, output)
 }
 
 /// Tries to write a simple EBML tag with a string value
 pub fn encode_string<T: Write>(tag: u64, string: &str, output: &mut T) -> IoResult<()> {
     encode_tag_header(tag, Varint::Value(string.len() as u64), output)?;
-    output.write_all(string.as_ref()).map(|()| string.len())?;
-    Ok(())
+    output.write_all(string.as_ref())
+}
 }
 
 #[derive(Debug, PartialEq)]
