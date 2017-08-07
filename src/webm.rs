@@ -81,7 +81,6 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
 }
 
 pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
-    let mut start = 0;
     match element {
         WebmElement::EbmlHead => {
             encode_element(EBML_HEAD_ID, output, |output| {
