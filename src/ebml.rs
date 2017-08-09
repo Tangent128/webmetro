@@ -197,10 +197,10 @@ pub fn encode_tag_header<T: Write>(tag: u64, size: Varint, output: &mut T) -> Io
     encode_varint(size, output)
 }
 
-/// Tries to write a simple EBML tag with a string value
-pub fn encode_string<T: Write>(tag: u64, string: &str, output: &mut T) -> IoResult<()> {
-    encode_tag_header(tag, Varint::Value(string.len() as u64), output)?;
-    output.write_all(string.as_ref())
+/// Tries to write a simple EBML tag with a string or binary value
+pub fn encode_bytes<T: Write>(tag: u64, bytes: &[u8], output: &mut T) -> IoResult<()> {
+    encode_tag_header(tag, Varint::Value(bytes.len() as u64), output)?;
+    output.write_all(bytes)
 }
 
 /// Tries to write a simple EBML tag with an integer value

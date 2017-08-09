@@ -83,7 +83,7 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
 pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
     match element {
         WebmElement::EbmlHead => encode_element(EBML_HEAD_ID, output, |output| {
-            encode_string(DOC_TYPE_ID, "webm", output)
+            encode_bytes(DOC_TYPE_ID, "webm".as_bytes(), output)
         }),
         WebmElement::Segment => encode_tag_header(SEGMENT_ID, Varint::Unknown, output),
         WebmElement::SeekHead => Ok(()),
