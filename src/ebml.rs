@@ -299,56 +299,56 @@ mod tests {
         assert_eq!(six_buffer.get_ref().remaining_mut(), 6);
 
         // 1 byte
-        assert_eq!(encode_varint(Varint::Unknown, &mut buffer).unwrap(), 1);
+        encode_varint(Varint::Unknown, &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0xFF].as_ref());
         assert_eq!(encode_varint(Varint::Unknown, &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
-        assert_eq!(encode_varint(Varint::Value(0), &mut buffer).unwrap(), 1);
+        encode_varint(Varint::Value(0), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0x80 | 0].as_ref());
         assert_eq!(encode_varint(Varint::Value(0), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
-        assert_eq!(encode_varint(Varint::Value(1), &mut buffer).unwrap(), 1);
+        encode_varint(Varint::Value(1), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0x80 | 1].as_ref());
         assert_eq!(encode_varint(Varint::Value(1), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
-        assert_eq!(encode_varint(Varint::Value(126), &mut buffer).unwrap(), 1);
+        encode_varint(Varint::Value(126), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0xF0 | 126].as_ref());
         assert_eq!(encode_varint(Varint::Value(126), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 2 bytes
-        assert_eq!(encode_varint(Varint::Value(127), &mut buffer).unwrap(), 2);
+        encode_varint(Varint::Value(127), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(2), &[0x40, 127].as_ref());
         assert_eq!(encode_varint(Varint::Value(127), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
-        assert_eq!(encode_varint(Varint::Value(128), &mut buffer).unwrap(), 2);
+        encode_varint(Varint::Value(128), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(2), &[0x40, 128].as_ref());
         assert_eq!(encode_varint(Varint::Value(128), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 6 bytes
         assert_eq!(six_buffer.get_ref().remaining_mut(), 6);
-        assert_eq!(encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut six_buffer).unwrap(), 6);
+        encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut six_buffer).unwrap();
         assert_eq!(six_buffer.get_ref().remaining_mut(), 0);
         assert_eq!(&six_buffer.get_ref().get_ref(), &[0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
         six_buffer = Cursor::new([0; 6]).writer();
 
         // 7 bytes
-        assert_eq!(encode_varint(Varint::Value(0x03FFFFFFFFFF), &mut buffer).unwrap(), 7);
+        encode_varint(Varint::Value(0x03FFFFFFFFFF), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(7), &[0x02, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF].as_ref());
 
-        assert_eq!(encode_varint(Varint::Value(0x01000000000000), &mut buffer).unwrap(), 7);
+        encode_varint(Varint::Value(0x01000000000000), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(7), &[0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref());
 
-        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut buffer).unwrap(), 7);
+        encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(7), &[0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
         assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut six_buffer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 8 bytes
-        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFF), &mut buffer).unwrap(), 8);
+        encode_varint(Varint::Value(0x01FFFFFFFFFFFF), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(8), &[0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF].as_ref());
 
-        assert_eq!(encode_varint(Varint::Value(0xFFFFFFFFFFFFFE), &mut buffer).unwrap(), 8);
+        encode_varint(Varint::Value(0xFFFFFFFFFFFFFE), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(8), &[0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
 
         assert_eq!(encode_varint(Varint::Value(0xFFFFFFFFFFFFFF), &mut buffer).unwrap_err().kind(), ErrorKind::InvalidInput);
