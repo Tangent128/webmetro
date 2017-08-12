@@ -1,5 +1,5 @@
-use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
-use bytes::{BigEndian, ByteOrder};
+use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
+use bytes::{BigEndian, BufMut, ByteOrder};
 use ebml::*;
 
 const SEGMENT_ID: u64 = 0x08538067;
@@ -80,6 +80,33 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
     }
 }
 
+pub fn encode_simple_block<T: Write>(element: WebmElement, output: &mut T) -> IoResult<()> {
+    if let WebmElement::SimpleBlock{
+        track,
+        timecode,
+        flags,
+        data
+    } = element {
+        // limiting number of tracks for now
+        if track > 31 {
+            return Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange));
+        }
+        let header_len = 1 + 2 + 1;
+        encode_tag_header(SIMPLE_BLOCK_ID, Varint::Value((header_len + data.len()) as u64), output)?;
+
+        encode_varint(Varint::Value(track), output)?;
+
+        let mut buffer = Cursor::new([0; 3]);
+        buffer.put_i16::<BigEndian>(timecode);
+        buffer.put_u8(flags);
+
+        output.write_all(&buffer.get_ref()[..])?;
+        output.write_all(data)
+    } else {
+        Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
+    }
+}
+
 pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
     match element {
         WebmElement::EbmlHead => encode_element(EBML_HEAD_ID, output, |output| {
@@ -90,6 +117,7 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
         WebmElement::Cues => Ok(()),
         WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
         WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
+        WebmElement::SimpleBlock {..} => encode_simple_block(element, output),
         _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
 }

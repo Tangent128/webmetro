@@ -12,6 +12,13 @@ pub fn main() {
     encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
     encode_webm_element(WebmElement::Timecode(0), &mut cursor).unwrap();
 
+    encode_webm_element(WebmElement::SimpleBlock {
+        track: 3,
+        flags: 0x0,
+        timecode: 123,
+        data: "Hello, World".as_bytes()
+    }, &mut cursor).unwrap();
+
     encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
     encode_webm_element(WebmElement::Timecode(1000), &mut cursor).unwrap();
 
