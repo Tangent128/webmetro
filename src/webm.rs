@@ -115,6 +115,7 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
         WebmElement::Segment => encode_tag_header(SEGMENT_ID, Varint::Unknown, output),
         WebmElement::SeekHead => Ok(()),
         WebmElement::Cues => Ok(()),
+        WebmElement::Tracks(data) => encode_bytes(TRACKS_ID, data, output),
         WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
         WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
         WebmElement::SimpleBlock {..} => encode_simple_block(element, output),
