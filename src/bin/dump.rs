@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use lab_ebml::Schema;
+use lab_ebml::webm::SimpleBlock;
 use lab_ebml::webm::Webm;
 use lab_ebml::webm::WebmElement::*;
 
@@ -22,7 +23,7 @@ pub fn main() {
         match element {
             // suppress printing byte arrays
             Tracks(slice) => println!("Tracks[{}]", slice.len()),
-            SimpleBlock{timecode, ..} => println!("SimpleBlock@{}", timecode),
+            SimpleBlock(SimpleBlock {timecode, ..}) => println!("SimpleBlock@{}", timecode),
             other => println!("{:?}", other)
         }
     }

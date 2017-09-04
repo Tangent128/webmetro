@@ -13,6 +13,14 @@ const SIMPLE_BLOCK_ID: u64 = 0x23;
 pub struct Webm;
 
 #[derive(Debug, PartialEq)]
+pub struct SimpleBlock<'b> {
+    pub track: u64,
+    pub timecode: i16,
+    pub flags: u8,
+    pub data: &'b[u8]
+}
+
+#[derive(Debug, PartialEq)]
 pub enum WebmElement<'b> {
     EbmlHead,
     Void,
@@ -23,12 +31,7 @@ pub enum WebmElement<'b> {
     Tracks(&'b[u8]),
     Cluster,
     Timecode(u64),
-    SimpleBlock {
-        track: u64,
-        timecode: i16,
-        flags: u8,
-        data: &'b[u8]
-    },
+    SimpleBlock(SimpleBlock<'b>),
     Unknown(u64)
 }
 
@@ -69,42 +72,40 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
         }
         let timecode = BigEndian::read_i16(&bytes[track_field_len..]);
         let flags = bytes[track_field_len + 2];
-        return Ok(WebmElement::SimpleBlock {
+        return Ok(WebmElement::SimpleBlock(SimpleBlock {
             track: track,
             timecode: timecode,
             flags: flags,
             data: &bytes[header_len..],
-        })
+        }))
     } else {
         return Err(Error::CorruptPayload);
     }
 }
 
-pub fn encode_simple_block<T: Write>(element: WebmElement, output: &mut T) -> IoResult<()> {
-    if let WebmElement::SimpleBlock{
+pub fn encode_simple_block<T: Write>(block: SimpleBlock, output: &mut T) -> IoResult<()> {
+    let SimpleBlock {
         track,
         timecode,
         flags,
         data
-    } = element {
-        // limiting number of tracks for now
-        if track > 31 {
-            return Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange));
-        }
-        let header_len = 1 + 2 + 1;
-        encode_tag_header(SIMPLE_BLOCK_ID, Varint::Value((header_len + data.len()) as u64), output)?;
+    } = block;
 
-        encode_varint(Varint::Value(track), output)?;
-
-        let mut buffer = Cursor::new([0; 3]);
-        buffer.put_i16::<BigEndian>(timecode);
-        buffer.put_u8(flags);
-
-        output.write_all(&buffer.get_ref()[..])?;
-        output.write_all(data)
-    } else {
-        Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
+    // limiting number of tracks for now
+    if track > 31 {
+        return Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange));
     }
+    let header_len = 1 + 2 + 1;
+    encode_tag_header(SIMPLE_BLOCK_ID, Varint::Value((header_len + data.len()) as u64), output)?;
+
+    encode_varint(Varint::Value(track), output)?;
+
+    let mut buffer = Cursor::new([0; 3]);
+    buffer.put_i16::<BigEndian>(timecode);
+    buffer.put_u8(flags);
+
+    output.write_all(&buffer.get_ref()[..])?;
+    output.write_all(data)
 }
 
 pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
@@ -118,7 +119,7 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
         WebmElement::Tracks(data) => encode_bytes(TRACKS_ID, data, output),
         WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
         WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
-        WebmElement::SimpleBlock {..} => encode_simple_block(element, output),
+        WebmElement::SimpleBlock(block) => encode_simple_block(block, output),
         _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
 }
@@ -142,24 +143,24 @@ mod tests {
 
         assert_eq!(iter.next(), Some(WebmElement::Cluster));
         assert_eq!(iter.next(), Some(WebmElement::Timecode(0)));
-        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock(SimpleBlock {
             track: 1,
             timecode: 0,
             flags: 0b10000000,
             data: &TEST_FILE[443..3683]
-        }));
-        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+        })));
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock(SimpleBlock {
             track: 1,
             timecode: 33,
             flags: 0b00000000,
             data: &TEST_FILE[3690..4735]
-        }));
-        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock {
+        })));
+        assert_eq!(iter.next(), Some(WebmElement::SimpleBlock(SimpleBlock {
             track: 1,
             timecode: 67,
             flags: 0b00000000,
             data: &TEST_FILE[4741..4801]
-        }));
+        })));
         for _ in 3..30 {
             // skip remaining contents for brevity
             iter.next();
