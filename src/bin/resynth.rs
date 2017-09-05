@@ -34,11 +34,11 @@ pub fn main() {
     let mut output = Vec::new();
     let mut cursor = Cursor::new(output);
 
-    for element in head {
+    for element in &head {
         encode_webm_element(element, &mut cursor).unwrap();
     }
 
-    for element in body {
+    for element in &body {
         encode_webm_element(element, &mut cursor).unwrap();
     }
 

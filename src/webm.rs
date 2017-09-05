@@ -83,8 +83,8 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
     }
 }
 
-pub fn encode_simple_block<T: Write>(block: SimpleBlock, output: &mut T) -> IoResult<()> {
-    let SimpleBlock {
+pub fn encode_simple_block<T: Write>(block: &SimpleBlock, output: &mut T) -> IoResult<()> {
+    let &SimpleBlock {
         track,
         timecode,
         flags,
@@ -108,18 +108,18 @@ pub fn encode_simple_block<T: Write>(block: SimpleBlock, output: &mut T) -> IoRe
     output.write_all(data)
 }
 
-pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T) -> IoResult<()> {
+pub fn encode_webm_element<T: Write + Seek>(element: &WebmElement, output: &mut T) -> IoResult<()> {
     match element {
-        WebmElement::EbmlHead => encode_element(EBML_HEAD_ID, output, |output| {
+        &WebmElement::EbmlHead => encode_element(EBML_HEAD_ID, output, |output| {
             encode_bytes(DOC_TYPE_ID, "webm".as_bytes(), output)
         }),
-        WebmElement::Segment => encode_tag_header(SEGMENT_ID, Varint::Unknown, output),
-        WebmElement::SeekHead => Ok(()),
-        WebmElement::Cues => Ok(()),
-        WebmElement::Tracks(data) => encode_bytes(TRACKS_ID, data, output),
-        WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
-        WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
-        WebmElement::SimpleBlock(block) => encode_simple_block(block, output),
+        &WebmElement::Segment => encode_tag_header(SEGMENT_ID, Varint::Unknown, output),
+        &WebmElement::SeekHead => Ok(()),
+        &WebmElement::Cues => Ok(()),
+        &WebmElement::Tracks(data) => encode_bytes(TRACKS_ID, data, output),
+        &WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
+        &WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
+        &WebmElement::SimpleBlock(ref block) => encode_simple_block(block, output),
         _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
 }
