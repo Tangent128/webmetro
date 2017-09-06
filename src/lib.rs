@@ -4,6 +4,7 @@ extern crate futures;
 
 pub mod ebml;
 mod iterator;
+pub mod timecode_fixer;
 pub mod webm;
 
 pub use ebml::{Error, Schema};

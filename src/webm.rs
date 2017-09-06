@@ -12,7 +12,7 @@ const TIMECODE_ID: u64 = 0x67;
 const SIMPLE_BLOCK_ID: u64 = 0x23;
 pub struct Webm;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SimpleBlock<'b> {
     pub track: u64,
     pub timecode: i16,
@@ -20,7 +20,7 @@ pub struct SimpleBlock<'b> {
     pub data: &'b[u8]
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum WebmElement<'b> {
     EbmlHead,
     Void,

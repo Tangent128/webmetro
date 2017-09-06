@@ -4,6 +4,7 @@ use std::io::{Cursor, stdout, Write};
 use lab_ebml::Schema;
 use lab_ebml::webm::*;
 use lab_ebml::webm::WebmElement::*;
+use lab_ebml::timecode_fixer::TimecodeFixer;
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 
@@ -34,12 +35,14 @@ pub fn main() {
     let mut output = Vec::new();
     let mut cursor = Cursor::new(output);
 
+    let mut fixer = TimecodeFixer::new();
+
     for element in &head {
-        encode_webm_element(element, &mut cursor).unwrap();
+        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
     }
 
     for element in &body {
-        encode_webm_element(element, &mut cursor).unwrap();
+        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
     }
 
     output = cursor.into_inner();
