@@ -45,6 +45,10 @@ pub fn main() {
         encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
     }
 
+    for element in &body {
+        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
+    }
+
     output = cursor.into_inner();
     stdout().write_all(&output).unwrap();
     output.clear();
