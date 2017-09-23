@@ -2,6 +2,7 @@
 extern crate bytes;
 extern crate futures;
 
+pub mod chunk;
 pub mod ebml;
 mod iterator;
 pub mod timecode_fixer;
