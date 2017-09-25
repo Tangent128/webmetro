@@ -1,4 +1,6 @@
+use std::io::Cursor;
 use std::rc::Rc;
+use webm::*;
 
 #[derive(Clone)]
 pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
@@ -17,6 +19,20 @@ pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
     }
 }
 
+impl<B: AsRef<[u8]>> Chunk<B> {
+    pub fn update_timecode(&mut self, timecode: u64) {
+        if let &mut Chunk::ClusterHead {ref mut start, ref mut end, ref mut bytes, ..} = self {
+            let delta = *end - *start;
+            *start = timecode;
+            *end = *start + delta;
+            let mut cursor = Cursor::new(bytes as &mut [u8]);
+            // buffer is sized so these should never fail
+            encode_webm_element(&WebmElement::Cluster, &mut cursor).unwrap();
+            encode_webm_element(&WebmElement::Timecode(timecode), &mut cursor).unwrap();
+        }
+    }
+}
+
 impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -31,8 +47,6 @@ impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
 mod tests {
 
     use chunk::*;
-    use std::io::Cursor;
-    use webm::*;
 
     #[test]
     fn enough_space_for_header() {
@@ -42,10 +56,6 @@ mod tests {
             end: 0,
             bytes: [0;16]
         };
-        if let Chunk::ClusterHead {ref mut bytes, ..} = chunk {
-            let mut cursor = Cursor::new(bytes as &mut [u8]);
-            encode_webm_element(&WebmElement::Cluster, &mut cursor).unwrap();
-            encode_webm_element(&WebmElement::Timecode(u64::max_value()), &mut cursor).unwrap();
-        }
+        chunk.update_timecode(u64::max_value());
     }
 }
