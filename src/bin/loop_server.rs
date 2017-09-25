@@ -4,16 +4,18 @@ extern crate lab_ebml;
 
 use futures::future::FutureResult;
 use futures::stream::{iter, Stream};
+use lab_ebml::chunk::Chunk;
 use hyper::{Get, StatusCode};
 use hyper::server::{Http, Request, Response, Service};
 use std::env::args;
+use std::rc::Rc;
 use std::net::ToSocketAddrs;
 
 //const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 
 struct WebmServer;
 
-type BodyStream = Box<Stream<Item = &'static str, Error = hyper::Error>>;
+type BodyStream = Box<Stream<Item = Chunk<&'static str>, Error = hyper::Error>>;
 
 impl Service for WebmServer {
     type Request = Request;
@@ -23,8 +25,12 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let pieces = vec!["<", "Insert WebM stream here.", ">"];
-                let stream: BodyStream = iter(pieces.into_iter().map(|x| Ok(x))).boxed();
+                let pieces = vec![
+                    Chunk::Headers {bytes: Rc::new("<")},
+                    Chunk::Headers {bytes: Rc::new("Insert WebM stream here")},
+                    Chunk::ClusterBody {bytes: Rc::new(">")}
+                ];
+                let stream: BodyStream = Box::new(iter(pieces.into_iter().map(|x| Ok(x))));
                 Response::new()
                     .with_body(stream)
             },
