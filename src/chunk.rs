@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
-pub enum Chunk {
+#[derive(Clone)]
+pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
     Headers {
-        bytes: Rc<Vec<u8>>
+        bytes: Rc<B>
     },
     ClusterHead {
         keyframe: bool,
@@ -12,16 +13,16 @@ pub enum Chunk {
         bytes: [u8;16]
     },
     ClusterBody {
-        bytes: Rc<Vec<u8>>
+        bytes: Rc<B>
     }
 }
 
-impl AsRef<[u8]> for Chunk {
+impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
     fn as_ref(&self) -> &[u8] {
         match self {
-            &Chunk::Headers {ref bytes, ..} => &bytes,
+            &Chunk::Headers {ref bytes, ..} => bytes.as_ref().as_ref(),
             &Chunk::ClusterHead {ref bytes, ..} => bytes,
-            &Chunk::ClusterBody {ref bytes, ..} => &bytes
+            &Chunk::ClusterBody {ref bytes, ..} => bytes.as_ref().as_ref()
         }
     }
 }
@@ -35,7 +36,7 @@ mod tests {
 
     #[test]
     fn enough_space_for_header() {
-        let mut chunk = Chunk::ClusterHead {
+        let mut chunk: Chunk = Chunk::ClusterHead {
             keyframe: false,
             start: 0,
             end: 0,
