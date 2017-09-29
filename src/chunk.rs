@@ -21,6 +21,18 @@ pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
 }
 
 impl<B: AsRef<[u8]>> Chunk<B> {
+    pub fn new_cluster_head(timecode: u64) -> Chunk {
+        let mut chunk = Chunk::ClusterHead {
+            keyframe: false,
+            start: 0,
+            end: 0,
+            bytes: [0;16],
+            bytes_used: 0
+        };
+        chunk.update_timecode(timecode);
+        chunk
+    }
+
     pub fn update_timecode(&mut self, timecode: u64) {
         if let &mut Chunk::ClusterHead {ref mut start, ref mut end, ref mut bytes, ref mut bytes_used, ..} = self {
             let delta = *end - *start;
@@ -31,6 +43,18 @@ impl<B: AsRef<[u8]>> Chunk<B> {
             encode_webm_element(&WebmElement::Cluster, &mut cursor).unwrap();
             encode_webm_element(&WebmElement::Timecode(timecode), &mut cursor).unwrap();
             *bytes_used = cursor.position() as u8;
+        }
+    }
+    pub fn extend_timespan(&mut self, timecode: u64) {
+        if let &mut Chunk::ClusterHead {start, ref mut end, ..} = self {
+            if timecode > start {
+                *end = timecode;
+            }
+        }
+    }
+    pub fn mark_keyframe(&mut self, new_keyframe: bool) {
+        if let &mut Chunk::ClusterHead {ref mut keyframe, ..} = self {
+            *keyframe = new_keyframe;
         }
     }
 }
