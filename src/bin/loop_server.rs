@@ -9,8 +9,8 @@ use hyper::{Get, StatusCode};
 use hyper::header::ContentType;
 use hyper::server::{Http, Request, Response, Service};
 use std::env::args;
-use std::rc::Rc;
 use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 
@@ -26,7 +26,7 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let stream: BodyStream = Box::new(once(Ok(Chunk::Headers {bytes: Rc::new(SRC_FILE)})));
+                let stream: BodyStream = Box::new(once(Ok(Chunk::Headers {bytes: Arc::new(SRC_FILE)})));
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
                     .with_body(stream)

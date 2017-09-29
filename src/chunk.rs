@@ -1,11 +1,11 @@
 use std::io::Cursor;
-use std::rc::Rc;
+use std::sync::Arc;
 use webm::*;
 
 #[derive(Clone)]
 pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
     Headers {
-        bytes: Rc<B>
+        bytes: Arc<B>
     },
     ClusterHead {
         keyframe: bool,
@@ -15,7 +15,7 @@ pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
         bytes: [u8;16]
     },
     ClusterBody {
-        bytes: Rc<B>
+        bytes: Arc<B>
     }
 }
 
