@@ -103,6 +103,9 @@ fn create_loop() -> WebmServer {
     }
 
     // finish last cluster
+    if let Some(chunk) = cluster_header.take() {
+        chunks.push(chunk);
+    }
     chunks.push(Chunk::ClusterBody {bytes: Arc::new(buffer.into_inner())});
 
     WebmServer(header.unwrap(), chunks)
