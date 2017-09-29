@@ -31,10 +31,11 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let results: Vec<Result<Chunk, hyper::Error>> = self.1.iter().map(|x| Ok(x.clone())).collect();
+                let results: Vec<Result<Chunk, ()>> = self.1.iter().map(|x| Ok(x.clone())).collect();
                 let stream: BodyStream<Vec<u8>> = Box::new(
                     once(Ok(self.0.clone()))
-                    .chain(iter(results))
+                    .chain(iter(results.into_iter().cycle().take(20)))
+                    .map_err(|_| hyper::Error::Incomplete)
                 );
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
