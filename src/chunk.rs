@@ -12,7 +12,8 @@ pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
         start: u64,
         end: u64,
         // space for a Cluster tag and a Timecode tag
-        bytes: [u8;16]
+        bytes: [u8;16],
+        bytes_used: u8
     },
     ClusterBody {
         bytes: Arc<B>
@@ -21,7 +22,7 @@ pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
 
 impl<B: AsRef<[u8]>> Chunk<B> {
     pub fn update_timecode(&mut self, timecode: u64) {
-        if let &mut Chunk::ClusterHead {ref mut start, ref mut end, ref mut bytes, ..} = self {
+        if let &mut Chunk::ClusterHead {ref mut start, ref mut end, ref mut bytes, ref mut bytes_used, ..} = self {
             let delta = *end - *start;
             *start = timecode;
             *end = *start + delta;
@@ -29,6 +30,7 @@ impl<B: AsRef<[u8]>> Chunk<B> {
             // buffer is sized so these should never fail
             encode_webm_element(&WebmElement::Cluster, &mut cursor).unwrap();
             encode_webm_element(&WebmElement::Timecode(timecode), &mut cursor).unwrap();
+            *bytes_used = cursor.position() as u8;
         }
     }
 }
@@ -37,7 +39,7 @@ impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
     fn as_ref(&self) -> &[u8] {
         match self {
             &Chunk::Headers {ref bytes, ..} => bytes.as_ref().as_ref(),
-            &Chunk::ClusterHead {ref bytes, ..} => bytes,
+            &Chunk::ClusterHead {ref bytes, bytes_used, ..} => bytes[..bytes_used as usize].as_ref(),
             &Chunk::ClusterBody {ref bytes, ..} => bytes.as_ref().as_ref()
         }
     }
