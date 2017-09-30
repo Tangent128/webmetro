@@ -45,7 +45,10 @@ impl TimecodeFixer {
 }
 
 pub struct ChunkTimecodeFixer<S> {
-    stream: S
+    stream: S,
+    current_offset: u64,
+    last_observed_timecode: u64,
+    assumed_duration: u64,
 }
 
 impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
@@ -54,7 +57,22 @@ impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
     type Error = S::Error;
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
-        self.stream.poll()
+        let mut poll_chunk = self.stream.poll();
+        match poll_chunk {
+            Ok(Async::Ready(Some(Chunk::ClusterHead {start, end, ..}))) => {
+                if start < self.last_observed_timecode {
+                    let next_timecode = self.last_observed_timecode + self.assumed_duration;
+                    self.current_offset = next_timecode - start;
+                }
+
+                if let Ok(Async::Ready(Some(ref mut cluster_head))) = poll_chunk {
+                    cluster_head.update_timecode(start + self.current_offset);
+                }
+                self.last_observed_timecode = end + self.current_offset;
+            },
+            _ => {}
+        };
+        poll_chunk
     }
 }
 
@@ -65,7 +83,10 @@ pub trait ChunkStream<T> {
 impl<T: Stream<Item = Chunk>> ChunkStream<T> for T {
     fn fix_timecodes(self) -> ChunkTimecodeFixer<T> {
         ChunkTimecodeFixer {
-            stream: self
+            stream: self,
+            current_offset: 0,
+            last_observed_timecode: 0,
+            assumed_duration: 33
         }
     }
 }
