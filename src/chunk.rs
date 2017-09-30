@@ -76,12 +76,6 @@ mod tests {
 
     #[test]
     fn enough_space_for_header() {
-        let mut chunk: Chunk = Chunk::ClusterHead {
-            keyframe: false,
-            start: 0,
-            end: 0,
-            bytes: [0;16]
-        };
-        chunk.update_timecode(u64::max_value());
+        Chunk::<Vec<u8>>::new_cluster_head(u64::max_value());
     }
 }
