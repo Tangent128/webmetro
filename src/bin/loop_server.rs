@@ -6,6 +6,7 @@ use futures::future::FutureResult;
 use futures::stream::{once, iter, Stream};
 use lab_ebml::chunk::Chunk;
 use lab_ebml::Schema;
+use lab_ebml::timecode_fixer::ChunkStream;
 use lab_ebml::webm::*;
 use lab_ebml::webm::WebmElement::*;
 use hyper::{Get, StatusCode};
@@ -36,6 +37,7 @@ impl Service for WebmServer {
                     once(Ok(self.0.clone()))
                     .chain(iter(results.into_iter().cycle().take(20)))
                     .map_err(|_| hyper::Error::Incomplete)
+                    .fix_timecodes()
                 );
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))

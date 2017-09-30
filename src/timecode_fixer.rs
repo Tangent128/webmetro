@@ -1,4 +1,6 @@
-// TODO: (iterator? stream?) adapter that fixes SimpleBlock/Cluster timecodes
+use chunk::Chunk;
+use futures::Async;
+use futures::stream::Stream;
 use webm::WebmElement;
 
 pub struct TimecodeFixer {
@@ -38,6 +40,32 @@ impl TimecodeFixer {
                 *element
             },
             _ => *element
+        }
+    }
+}
+
+pub struct ChunkTimecodeFixer<S> {
+    stream: S
+}
+
+impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
+{
+    type Item = S::Item;
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        self.stream.poll()
+    }
+}
+
+pub trait ChunkStream<T> {
+    fn fix_timecodes(self) -> ChunkTimecodeFixer<T>;
+}
+
+impl<T: Stream<Item = Chunk>> ChunkStream<T> for T {
+    fn fix_timecodes(self) -> ChunkTimecodeFixer<T> {
+        ChunkTimecodeFixer {
+            stream: self
         }
     }
 }
