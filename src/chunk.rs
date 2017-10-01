@@ -1,3 +1,4 @@
+use futures::{Async, Stream};
 use std::io::Cursor;
 use std::sync::Arc;
 use webm::*;
@@ -65,6 +66,32 @@ impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
             &Chunk::Headers {ref bytes, ..} => bytes.as_ref().as_ref(),
             &Chunk::ClusterHead {ref bytes, bytes_used, ..} => bytes[..bytes_used as usize].as_ref(),
             &Chunk::ClusterBody {ref bytes, ..} => bytes.as_ref().as_ref()
+        }
+    }
+}
+
+pub struct WebmChunker<S> {
+    stream: S
+}
+
+impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
+{
+    type Item = Chunk;
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        Ok(Async::NotReady)
+    }
+}
+
+pub trait WebmStream<T> {
+    fn chunk_webm(self) -> WebmChunker<T>;
+}
+
+impl<'a, T: Stream<Item = WebmElement<'a>>> WebmStream<T> for T {
+    fn chunk_webm(self) -> WebmChunker<T> {
+        WebmChunker {
+            stream: self
         }
     }
 }
