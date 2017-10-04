@@ -133,6 +133,10 @@ impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
                             continue;
                         },
                         Ok(Async::Ready(Some(WebmElement::SimpleBlock(ref block)))) => {
+                            if (block.flags & 0b10000000) != 0 {
+                                // TODO: this is incorrect, condition needs to also affirm we're the first video block of the cluster
+                                cluster_head.mark_keyframe(true);
+                            }
                             cluster_head.observe_simpleblock_timecode(block.timecode);
                             encode_webm_element(&WebmElement::SimpleBlock(*block), buffer);
                             continue;
