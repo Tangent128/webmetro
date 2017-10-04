@@ -92,7 +92,7 @@ fn create_loop() -> WebmServer {
                         // TODO: this is incorrect, condition needs to also affirm we're the first video block of the cluster
                         chunk.mark_keyframe(true);
                     }
-                    chunk.extend_timespan(cluster_timecode + (block.timecode as u64));
+                    chunk.observe_simpleblock_timecode(block.timecode);
                 }
                 encode_webm_element(&SimpleBlock(*block), &mut buffer).unwrap();
             },

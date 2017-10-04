@@ -47,10 +47,11 @@ impl<B: AsRef<[u8]>> Chunk<B> {
             *bytes_used = cursor.position() as u8;
         }
     }
-    pub fn extend_timespan(&mut self, timecode: u64) {
+    pub fn observe_simpleblock_timecode(&mut self, timecode: i16) {
         if let &mut Chunk::ClusterHead {start, ref mut end, ..} = self {
-            if timecode > start {
-                *end = timecode;
+            let absolute_timecode = start + (timecode as u64);
+            if absolute_timecode > start {
+                *end = absolute_timecode;
             }
         }
     }
