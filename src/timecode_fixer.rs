@@ -49,6 +49,7 @@ pub struct ChunkTimecodeFixer<S> {
     current_offset: u64,
     last_observed_timecode: u64,
     assumed_duration: u64,
+    seen_header: bool
 }
 
 impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
@@ -70,6 +71,13 @@ impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
                 }
                 self.last_observed_timecode = end + self.current_offset;
             },
+            Ok(Async::Ready(Some(Chunk::Headers {..}))) => {
+                if self.seen_header {
+                    return self.poll();
+                } else {
+                    self.seen_header = true;
+                }
+            },
             _ => {}
         };
         poll_chunk
@@ -86,7 +94,8 @@ impl<T: Stream<Item = Chunk>> ChunkStream<T> for T {
             stream: self,
             current_offset: 0,
             last_observed_timecode: 0,
-            assumed_duration: 33
+            assumed_duration: 33,
+            seen_header: false
         }
     }
 }
