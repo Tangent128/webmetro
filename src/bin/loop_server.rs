@@ -4,7 +4,7 @@ extern crate lab_ebml;
 
 use futures::future::FutureResult;
 use futures::stream::{iter, Stream};
-use lab_ebml::chunk::{Chunk, WebmStream};
+use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
 use lab_ebml::Schema;
 use lab_ebml::timecode_fixer::ChunkStream;
 use lab_ebml::webm::*;
@@ -33,6 +33,10 @@ impl Service for WebmServer {
                     .chunk_webm()
                     .chain(iter(Webm.parse(SRC_FILE).into_iter().map(|x| Ok(x))).chunk_webm())
                     .fix_timecodes()
+                    .map_err(|err| match err {
+                        ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
+                        ChunkingError::OtherError(otx_err) => otx_err
+                    })
                     .boxed();
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
