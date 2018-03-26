@@ -2,6 +2,7 @@ use bytes::{BigEndian, ByteOrder, BufMut};
 use std::error::Error as ErrorTrait;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
+use std::marker::PhantomData;
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
@@ -214,20 +215,21 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Ebml<S, T>(pub S, pub T);
+pub struct Ebml<Source, Element> {
+    pub source: Source,
+    _marker: PhantomData<fn() -> Element>
+}
 
-pub trait Schema<'a> {
-    type Element: 'a;
+pub trait FromEbml<'b>: Sized {
+    fn should_unwrap(element_id: u64) -> bool;
+    fn decode(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
 
-    fn should_unwrap(&self, element_id: u64) -> bool;
-    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<Self::Element, Error>;
-
-    fn decode_element<'b: 'a>(&self, bytes: &'b[u8]) -> Result<Option<(Self::Element, usize)>, Error> {
+    fn decode_element(bytes: &'b[u8]) -> Result<Option<(Self, usize)>, Error> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
             Ok(Some((element_id, payload_size_tag, tag_size))) => {
-                let should_unwrap = self.should_unwrap(element_id);
+                let should_unwrap = Self::should_unwrap(element_id);
 
                 let payload_size = match (should_unwrap, payload_size_tag) {
                     (true, _) => 0,
@@ -241,7 +243,7 @@ pub trait Schema<'a> {
                     return Ok(None);
                 }
 
-                match self.decode(element_id, &bytes[tag_size..element_size]) {
+                match Self::decode(element_id, &bytes[tag_size..element_size]) {
                     Ok(element) => Ok(Some((element, element_size))),
                     Err(error) => Err(error)
                 }
@@ -249,8 +251,11 @@ pub trait Schema<'a> {
         }
     }
 
-    fn parse<T>(self, source: T) -> Ebml<Self, T> where Self: Sized {
-        Ebml(self, source)
+    fn parse<T>(source: T) -> Ebml<T, Self> {
+        Ebml {
+            source: source,
+            _marker: PhantomData
+        }
     }
 }
 
@@ -398,21 +403,17 @@ mod tests {
         assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,1]), Ok(9223372036854775809));
     }
 
-    struct Dummy;
-
     #[derive(Debug, PartialEq)]
     struct GenericElement(u64, usize);
 
-    impl<'a> Schema<'a> for Dummy {
-        type Element = GenericElement;
-
-        fn should_unwrap(&self, element_id: u64) -> bool {
+    impl<'a> FromEbml<'a> for GenericElement {
+        fn should_unwrap(element_id: u64) -> bool {
             match element_id {
                 _ => false
             }
         }
 
-        fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<GenericElement, Error> {
+        fn decode(element_id: u64, bytes: &'a[u8]) -> Result<GenericElement, Error> {
             match element_id {
                 _ => Ok(GenericElement(element_id, bytes.len()))
             }
@@ -421,7 +422,7 @@ mod tests {
 
     #[test]
     fn decode_sanity_test() {
-        let decoded = Dummy.decode_element(TEST_FILE);
+        let decoded = GenericElement::decode_element(TEST_FILE);
         assert_eq!(decoded, Ok(Some((GenericElement(0x0A45DFA3, 31), 43))));
     }
 }

@@ -1,30 +1,31 @@
+use std::marker::PhantomData;
 use ebml::*;
 
-pub struct EbmlIterator<'b, T: Schema<'b>> {
-    schema: T,
+pub struct EbmlIterator<'b, T: FromEbml<'b>> {
     slice: &'b[u8],
     position: usize,
+    _marker: PhantomData<fn() -> T>
 }
 
-impl<'b, S: Schema<'b>> IntoIterator for Ebml<S, &'b[u8]> {
-    type Item = S::Element;
-    type IntoIter = EbmlIterator<'b, S>;
+impl<'b, E: FromEbml<'b>> IntoIterator for Ebml<&'b[u8], E> {
+    type Item = E;
+    type IntoIter = EbmlIterator<'b, E>;
 
-    fn into_iter(self) -> EbmlIterator<'b, S>
+    fn into_iter(self) -> EbmlIterator<'b, E>
     {
         EbmlIterator {
-            schema: self.0,
-            slice: self.1,
-            position: 0
+            slice: self.source,
+            position: 0,
+            _marker: PhantomData
         }
     }
 }
 
-impl<'b, T: Schema<'b>> Iterator for EbmlIterator<'b, T> {
-    type Item = T::Element;
+impl<'b, T: FromEbml<'b>> Iterator for EbmlIterator<'b, T> {
+    type Item = T;
 
-    fn next(&mut self) -> Option<T::Element> {
-        match self.schema.decode_element(&self.slice[self.position..]) {
+    fn next(&mut self) -> Option<T> {
+        match Self::Item::decode_element(&self.slice[self.position..]) {
             Err(_) => None,
             Ok(None) => None,
             Ok(Some((element, element_size))) => {

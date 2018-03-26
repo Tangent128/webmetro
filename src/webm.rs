@@ -10,7 +10,10 @@ const TRACKS_ID: u64 = 0x0654AE6B;
 const CLUSTER_ID: u64 = 0x0F43B675;
 const TIMECODE_ID: u64 = 0x67;
 const SIMPLE_BLOCK_ID: u64 = 0x23;
-pub struct Webm;
+
+pub fn parse_webm<'a, T: 'a>(source: T) -> Ebml<T, WebmElement<'a>> {
+    WebmElement::parse(source)
+}
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SimpleBlock<'b> {
@@ -35,10 +38,8 @@ pub enum WebmElement<'b> {
     Unknown(u64)
 }
 
-impl<'a> Schema<'a> for Webm {
-    type Element = WebmElement<'a>;
-
-    fn should_unwrap(&self, element_id: u64) -> bool {
+impl<'b> FromEbml<'b> for WebmElement<'b> {
+    fn should_unwrap(element_id: u64) -> bool {
         match element_id {
             // Segment
             SEGMENT_ID => true,
@@ -47,7 +48,7 @@ impl<'a> Schema<'a> for Webm {
         }
     }
 
-    fn decode<'b: 'a>(&self, element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, Error> {
+    fn decode(element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, Error> {
         match element_id {
             EBML_HEAD_ID => Ok(WebmElement::EbmlHead),
             VOID_ID => Ok(WebmElement::Void),
@@ -131,7 +132,7 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let mut iter = Webm.parse(TEST_FILE).into_iter();
+        let mut iter = parse_webm(TEST_FILE).into_iter();
 
         // test that we match the structure of the test file
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));

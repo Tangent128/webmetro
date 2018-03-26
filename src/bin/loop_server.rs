@@ -5,7 +5,6 @@ extern crate lab_ebml;
 use futures::future::FutureResult;
 use futures::stream::{iter, Stream};
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
-use lab_ebml::Schema;
 use lab_ebml::timecode_fixer::ChunkStream;
 use lab_ebml::webm::*;
 use hyper::{Get, StatusCode};
@@ -29,9 +28,9 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let stream: BodyStream<Vec<u8>> = iter(Webm.parse(SRC_FILE).into_iter().map(|x| Ok(x)))
+                let stream: BodyStream<Vec<u8>> = iter(parse_webm(SRC_FILE).into_iter().map(|x| Ok(x)))
                     .chunk_webm()
-                    .chain(iter(Webm.parse(SRC_FILE).into_iter().map(|x| Ok(x))).chunk_webm())
+                    .chain(iter(parse_webm(SRC_FILE).into_iter().map(|x| Ok(x))).chunk_webm())
                     .fix_timecodes()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),

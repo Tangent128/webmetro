@@ -1,7 +1,6 @@
 extern crate lab_ebml;
 
 use std::io::{Cursor, stdout, Write};
-use lab_ebml::Schema;
 use lab_ebml::webm::*;
 use lab_ebml::webm::WebmElement::*;
 use lab_ebml::timecode_fixer::TimecodeFixer;
@@ -15,7 +14,7 @@ pub fn main() {
 
     let mut reading_head = true;
 
-    for element in Webm.parse(SRC_FILE) {
+    for element in parse_webm(SRC_FILE) {
         match element {
             Cluster => reading_head = false,
             // TODO: skip elements not required for streaming

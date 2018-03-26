@@ -4,9 +4,7 @@ use std::env::args;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use lab_ebml::Schema;
-use lab_ebml::webm::SimpleBlock;
-use lab_ebml::webm::Webm;
+use lab_ebml::webm::{ parse_webm, SimpleBlock };
 use lab_ebml::webm::WebmElement::*;
 
 pub fn main() {
@@ -19,7 +17,7 @@ pub fn main() {
 
     file.read_to_end(&mut buffer).expect("Reading file contents");
 
-    for element in Webm.parse(buffer.as_slice()) {
+    for element in parse_webm(buffer.as_slice()) {
         match element {
             // suppress printing byte arrays
             Tracks(slice) => println!("Tracks[{}]", slice.len()),
