@@ -60,16 +60,15 @@ impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
         let mut poll_chunk = self.stream.poll();
         match poll_chunk {
-            Ok(Async::Ready(Some(Chunk::ClusterHead {start, end, ..}))) => {
+            Ok(Async::Ready(Some(Chunk::ClusterHead(ref mut cluster_head)))) => {
+                let start = cluster_head.start;
                 if start < self.last_observed_timecode {
                     let next_timecode = self.last_observed_timecode + self.assumed_duration;
                     self.current_offset = next_timecode - start;
                 }
 
-                if let Ok(Async::Ready(Some(ref mut cluster_head))) = poll_chunk {
-                    cluster_head.update_timecode(start + self.current_offset);
-                }
-                self.last_observed_timecode = end + self.current_offset;
+                cluster_head.update_timecode(start + self.current_offset);
+                self.last_observed_timecode = cluster_head.end + self.current_offset;
             },
             Ok(Async::Ready(Some(Chunk::Headers {..}))) => {
                 if self.seen_header {
