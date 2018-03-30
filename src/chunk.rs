@@ -6,7 +6,7 @@ use std::sync::Arc;
 use ebml::EbmlEventSource;
 use webm::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ClusterHead {
     pub keyframe: bool,
     pub start: u64,
@@ -73,6 +73,7 @@ impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
     }
 }
 
+#[derive(Debug)]
 enum ChunkerState {
     BuildingHeader(Cursor<Vec<u8>>),
     // WIP ClusterHead & body buffer
@@ -82,6 +83,7 @@ enum ChunkerState {
     End
 }
 
+#[derive(Debug)]
 pub enum ChunkingError<E> {
     IoError(::std::io::Error),
     OtherError(E)
