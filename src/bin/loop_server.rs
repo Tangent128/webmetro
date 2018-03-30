@@ -28,14 +28,15 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let stream: BodyStream<Vec<u8>> = parse_webm(SRC_FILE).into_iter().chunk_webm()
+                let stream: BodyStream<Vec<u8>> = Box::new(
+                    parse_webm(SRC_FILE).into_iter().chunk_webm()
                     .chain(parse_webm(SRC_FILE).into_iter().chunk_webm())
                     .fix_timecodes()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
                         ChunkingError::OtherError(_) => hyper::Error::Incomplete
                     })
-                    .boxed();
+                );
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
                     .with_body(stream)

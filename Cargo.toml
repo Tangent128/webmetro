@@ -5,5 +5,5 @@ authors = ["Tangent 128 <Tangent128@gmail.com>"]
 
 [dependencies]
 bytes = "0.4"
-futures = "0.1.14"
-hyper = "0.11.2"
+futures = "0.1.20"
+hyper = "0.11.24"
