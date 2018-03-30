@@ -1,4 +1,5 @@
 use bytes::{BigEndian, ByteOrder, BufMut};
+use futures::Async;
 use std::error::Error as ErrorTrait;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
@@ -257,6 +258,12 @@ pub trait FromEbml<'b>: Sized {
             _marker: PhantomData
         }
     }
+}
+
+pub trait EbmlEventSource<'a> {
+    type Event: FromEbml<'a>;
+    type Error;
+    fn poll_event(&mut self) -> Result<Async<Option<Self::Event>>, Self::Error>;
 }
 
 #[cfg(test)]

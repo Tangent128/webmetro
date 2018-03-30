@@ -3,7 +3,7 @@ extern crate hyper;
 extern crate lab_ebml;
 
 use futures::future::FutureResult;
-use futures::stream::{iter, Stream};
+use futures::stream::Stream;
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
 use lab_ebml::timecode_fixer::ChunkStream;
 use lab_ebml::webm::*;
@@ -28,13 +28,12 @@ impl Service for WebmServer {
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let stream: BodyStream<Vec<u8>> = iter(parse_webm(SRC_FILE).into_iter().map(|x| Ok(x)))
-                    .chunk_webm()
-                    .chain(iter(parse_webm(SRC_FILE).into_iter().map(|x| Ok(x))).chunk_webm())
+                let stream: BodyStream<Vec<u8>> = parse_webm(SRC_FILE).into_iter().chunk_webm()
+                    .chain(parse_webm(SRC_FILE).into_iter().chunk_webm())
                     .fix_timecodes()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
-                        ChunkingError::OtherError(otx_err) => otx_err
+                        ChunkingError::OtherError(_) => hyper::Error::Incomplete
                     })
                     .boxed();
                 Response::new()
@@ -51,6 +50,6 @@ impl Service for WebmServer {
 }
 
 pub fn main() {
-    let addr = args().nth(1).unwrap().to_socket_addrs().unwrap().next().unwrap();
+    let addr = args().nth(1).expect("Need binding address+port").to_socket_addrs().unwrap().next().unwrap();
     Http::new().bind(&addr, move || Ok(WebmServer)).unwrap().run().unwrap();
 }

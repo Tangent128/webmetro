@@ -1,7 +1,9 @@
 use futures::{Async, Stream};
 use std::io::Cursor;
+use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
+use ebml::EbmlEventSource;
 use webm::*;
 
 #[derive(Clone)]
@@ -85,12 +87,13 @@ pub enum ChunkingError<E> {
     OtherError(E)
 }
 
-pub struct WebmChunker<S> {
-    stream: S,
-    state: ChunkerState
+pub struct WebmChunker<'a, S: EbmlEventSource<'a>> {
+    source: S,
+    state: ChunkerState,
+    _marker: PhantomData<&'a [u8]>
 }
 
-impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
+impl<'a, S: EbmlEventSource<'a, Event = WebmElement<'a>>> Stream for WebmChunker<'a, S>
 {
     type Item = Chunk;
     type Error = ChunkingError<S::Error>;
@@ -99,7 +102,7 @@ impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
         loop {
             let (return_value, next_state) = match self.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
-                    match self.stream.poll() {
+                    match self.source.poll_event() {
                         Err(passthru) => return Err(ChunkingError::OtherError(passthru)),
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
@@ -126,7 +129,7 @@ impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
                     }
                 },
                 ChunkerState::BuildingCluster(ref mut cluster_head, ref mut buffer) => {
-                    match self.stream.poll() {
+                    match self.source.poll_event() {
                         Err(passthru) => return Err(ChunkingError::OtherError(passthru)),
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Ok(Async::Ready(Some(WebmElement::Cluster))) => {
@@ -205,15 +208,16 @@ impl<'a, S: Stream<Item = WebmElement<'a>>> Stream for WebmChunker<S>
     }
 }
 
-pub trait WebmStream<T> {
-    fn chunk_webm(self) -> WebmChunker<T>;
+pub trait WebmStream<'a, T: EbmlEventSource<'a, Event = WebmElement<'a>>> {
+    fn chunk_webm(self) -> WebmChunker<'a, T>;
 }
 
-impl<'a, T: Stream<Item = WebmElement<'a>>> WebmStream<T> for T {
-    fn chunk_webm(self) -> WebmChunker<T> {
+impl<'a, T: EbmlEventSource<'a, Event = WebmElement<'a>>> WebmStream<'a, T> for T {
+    fn chunk_webm(self) -> WebmChunker<'a, T> {
         WebmChunker {
-            stream: self,
-            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new()))
+            source: self,
+            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new())),
+            _marker: PhantomData
         }
     }
 }

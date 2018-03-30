@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use futures::Async;
 use ebml::*;
 
 pub struct EbmlIterator<'b, T: FromEbml<'b>> {
@@ -31,6 +32,22 @@ impl<'b, T: FromEbml<'b>> Iterator for EbmlIterator<'b, T> {
             Ok(Some((element, element_size))) => {
                 self.position += element_size;
                 Some(element)
+            }
+        }
+    }
+}
+
+impl<'a, T: FromEbml<'a>> EbmlEventSource<'a> for EbmlIterator<'a, T> {
+    type Event = T;
+    type Error = Error;
+
+    fn poll_event(&mut self) -> Result<Async<Option<T>>, Error> {
+        match Self::Event::decode_element(&self.slice[self.position..]) {
+            Err(err) => Err(err),
+            Ok(None) => Ok(Async::Ready(None)),
+            Ok(Some((element, element_size))) => {
+                self.position += element_size;
+                Ok(Async::Ready(Some(element)))
             }
         }
     }
