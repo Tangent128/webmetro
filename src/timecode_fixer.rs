@@ -68,7 +68,7 @@ impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
                 }
 
                 cluster_head.update_timecode(start + self.current_offset);
-                self.last_observed_timecode = cluster_head.end + self.current_offset;
+                self.last_observed_timecode = cluster_head.end;
             },
             Ok(Async::Ready(Some(Chunk::Headers {..}))) => {
                 if self.seen_header {
