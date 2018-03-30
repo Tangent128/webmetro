@@ -119,6 +119,8 @@ impl<'a, S: EbmlEventSource<'a, Event = WebmElement<'a>>> Stream for WebmChunker
                                 )
                             )
                         },
+                        Ok(Async::Ready(Some(WebmElement::Info))) => continue,
+                        Ok(Async::Ready(Some(WebmElement::Void))) => continue,
                         Ok(Async::Ready(Some(element @ _))) => {
                             match encode_webm_element(&element, buffer) {
                                 Ok(_) => continue,
