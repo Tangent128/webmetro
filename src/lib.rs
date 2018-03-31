@@ -5,6 +5,7 @@ extern crate futures;
 pub mod chunk;
 pub mod ebml;
 mod iterator;
+pub mod webm_stream;
 pub mod timecode_fixer;
 pub mod webm;
 
