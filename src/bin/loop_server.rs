@@ -32,7 +32,7 @@ impl Service for WebmServer {
                 let stream: BodyStream<Vec<u8>> = Box::new(
                     repeat(()).take(10)
                     .map(|()|
-                        parse_webm(SRC_FILE).into_iter().chunk_webm()
+                        parse_webm(SRC_FILE).chunk_webm()
                     ).flatten()
                     .fix_timecodes()
                     .map_err(|err| match err {

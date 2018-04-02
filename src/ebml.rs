@@ -3,7 +3,6 @@ use futures::Async;
 use std::error::Error as ErrorTrait;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
-use std::marker::PhantomData;
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
@@ -216,9 +215,8 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Ebml<Source, Element> {
-    pub source: Source,
-    _marker: PhantomData<fn() -> Element>
+pub struct Ebml<Source> {
+    pub source: Source
 }
 
 pub trait FromEbml<'b>: Sized {
@@ -249,13 +247,6 @@ pub trait FromEbml<'b>: Sized {
                     Err(error) => Err(error)
                 }
             }
-        }
-    }
-
-    fn parse<T>(source: T) -> Ebml<T, Self> {
-        Ebml {
-            source: source,
-            _marker: PhantomData
         }
     }
 }

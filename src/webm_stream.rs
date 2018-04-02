@@ -71,12 +71,11 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmStream<S> {
     }
 }
 
-impl<'a, I: AsRef<[u8]>, S: Stream<Item = I>> EbmlEventSource<'a> for WebmStream<S> {
-    type Event = WebmElement<'a>;
+impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmEventSource for WebmStream<S> {
     type Error = ParsingError<S::Error>;
 
-    fn poll_event(&'a mut self) -> Result<Async<Option<Self::Event>>, Self::Error> {
-        return WebmStream::poll_event(&mut self);
+    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Self::Error> {
+        return WebmStream::poll_event(self);
     }
 }
 

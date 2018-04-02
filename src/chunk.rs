@@ -1,9 +1,7 @@
 use futures::{Async, Stream};
 use std::io::Cursor;
-use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
-use ebml::EbmlEventSource;
 use webm::*;
 
 #[derive(Clone, Debug)]
@@ -89,13 +87,12 @@ pub enum ChunkingError<E> {
     OtherError(E)
 }
 
-pub struct WebmChunker<'a, S: EbmlEventSource<'a>> {
+pub struct WebmChunker<S: WebmEventSource> {
     source: S,
-    state: ChunkerState,
-    _marker: PhantomData<&'a [u8]>
+    state: ChunkerState
 }
 
-impl<'a, S: EbmlEventSource<'a, Event = WebmElement<'a>>> Stream for WebmChunker<'a, S>
+impl<'a, S: WebmEventSource> Stream for WebmChunker<S>
 {
     type Item = Chunk;
     type Error = ChunkingError<S::Error>;
@@ -212,16 +209,15 @@ impl<'a, S: EbmlEventSource<'a, Event = WebmElement<'a>>> Stream for WebmChunker
     }
 }
 
-pub trait WebmStream<'a, T: EbmlEventSource<'a, Event = WebmElement<'a>>> {
-    fn chunk_webm(self) -> WebmChunker<'a, T>;
+pub trait WebmStream<T: WebmEventSource> {
+    fn chunk_webm(self) -> WebmChunker<T>;
 }
 
-impl<'a, T: EbmlEventSource<'a, Event = WebmElement<'a>>> WebmStream<'a, T> for T {
-    fn chunk_webm(self) -> WebmChunker<'a, T> {
+impl<'a, T: WebmEventSource> WebmStream<T> for T {
+    fn chunk_webm(self) -> WebmChunker<T> {
         WebmChunker {
             source: self,
-            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new())),
-            _marker: PhantomData
+            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new()))
         }
     }
 }

@@ -1,32 +1,26 @@
-use std::marker::PhantomData;
 use futures::Async;
 use ebml::*;
+use webm::*;
 
-pub struct EbmlIterator<'b, T: FromEbml<'b>> {
-    slice: &'b[u8],
-    position: usize,
-    _marker: PhantomData<fn() -> T>
+pub struct EbmlCursor<T> {
+    source: T,
+    position: usize
 }
 
-impl<'b, E: FromEbml<'b>> IntoIterator for Ebml<&'b[u8], E> {
-    type Item = E;
-    type IntoIter = EbmlIterator<'b, E>;
-
-    fn into_iter(self) -> EbmlIterator<'b, E>
-    {
-        EbmlIterator {
-            slice: self.source,
-            position: 0,
-            _marker: PhantomData
+impl<T> EbmlCursor<T> {
+    pub fn new(source: T) -> Self {
+        EbmlCursor {
+            source,
+            position: 0
         }
     }
 }
 
-impl<'b, T: FromEbml<'b>> Iterator for EbmlIterator<'b, T> {
-    type Item = T;
+impl<'a> Iterator for EbmlCursor<&'a [u8]> {
+    type Item = WebmElement<'a>;
 
-    fn next(&mut self) -> Option<T> {
-        match Self::Item::decode_element(&self.slice[self.position..]) {
+    fn next(&mut self) -> Option<WebmElement<'a>> {
+        match Self::Item::decode_element(&self.source[self.position..]) {
             Err(_) => None,
             Ok(None) => None,
             Ok(Some((element, element_size))) => {
@@ -37,12 +31,11 @@ impl<'b, T: FromEbml<'b>> Iterator for EbmlIterator<'b, T> {
     }
 }
 
-impl<'a, T: FromEbml<'a>> EbmlEventSource<'a> for EbmlIterator<'a, T> {
-    type Event = T;
+impl<'b, T: AsRef<[u8]>> WebmEventSource for EbmlCursor<T> {
     type Error = Error;
 
-    fn poll_event(&'a mut self) -> Result<Async<Option<T>>, Error> {
-        match Self::Event::decode_element(&self.slice[self.position..]) {
+    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Error> {
+        match WebmElement::decode_element(&self.source.as_ref()[self.position..]) {
             Err(err) => Err(err),
             Ok(None) => Ok(Async::Ready(None)),
             Ok(Some((element, element_size))) => {

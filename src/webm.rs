@@ -1,6 +1,8 @@
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
 use bytes::{BigEndian, BufMut, ByteOrder};
+use futures::Async;
 use ebml::*;
+use iterator::EbmlCursor;
 
 const SEGMENT_ID: u64 = 0x08538067;
 const SEEK_HEAD_ID: u64 = 0x014D9B74;
@@ -11,8 +13,8 @@ const CLUSTER_ID: u64 = 0x0F43B675;
 const TIMECODE_ID: u64 = 0x67;
 const SIMPLE_BLOCK_ID: u64 = 0x23;
 
-pub fn parse_webm<'a, T: 'a>(source: T) -> Ebml<T, WebmElement<'a>> {
-    WebmElement::parse(source)
+pub fn parse_webm<T: AsRef<[u8]>>(source: T) -> EbmlCursor<T> {
+    EbmlCursor::new(source)
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -123,6 +125,11 @@ pub fn encode_webm_element<T: Write + Seek>(element: &WebmElement, output: &mut 
         &WebmElement::SimpleBlock(ref block) => encode_simple_block(block, output),
         _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
+}
+
+pub trait WebmEventSource {
+    type Error;
+    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Self::Error>;
 }
 
 #[cfg(test)]
