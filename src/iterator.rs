@@ -1,5 +1,6 @@
 use futures::Async;
-use ebml::*;
+use ebml::Error as EbmlError;
+use ebml::FromEbml;
 use webm::*;
 
 pub struct EbmlCursor<T> {
@@ -7,8 +8,8 @@ pub struct EbmlCursor<T> {
     position: usize
 }
 
-impl<T> EbmlCursor<T> {
-    pub fn new(source: T) -> Self {
+impl<S> EbmlCursor<S> {
+    pub fn new(source: S) -> Self {
         EbmlCursor {
             source,
             position: 0
@@ -20,7 +21,7 @@ impl<'a> Iterator for EbmlCursor<&'a [u8]> {
     type Item = WebmElement<'a>;
 
     fn next(&mut self) -> Option<WebmElement<'a>> {
-        match Self::Item::decode_element(&self.source[self.position..]) {
+        match Self::Item::decode_element(&self.source.as_ref()[self.position..]) {
             Err(_) => None,
             Ok(None) => None,
             Ok(Some((element, element_size))) => {
@@ -31,10 +32,10 @@ impl<'a> Iterator for EbmlCursor<&'a [u8]> {
     }
 }
 
-impl<'b, T: AsRef<[u8]>> WebmEventSource for EbmlCursor<T> {
-    type Error = Error;
+impl<'b, S: AsRef<[u8]>> WebmEventSource for EbmlCursor<S> {
+    type Error = EbmlError;
 
-    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Error> {
+    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, EbmlError> {
         match WebmElement::decode_element(&self.source.as_ref()[self.position..]) {
             Err(err) => Err(err),
             Ok(None) => Ok(Async::Ready(None)),
