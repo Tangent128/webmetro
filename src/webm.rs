@@ -13,8 +13,8 @@ const CLUSTER_ID: u64 = 0x0F43B675;
 const TIMECODE_ID: u64 = 0x67;
 const SIMPLE_BLOCK_ID: u64 = 0x23;
 
-pub fn parse_webm<T: AsRef<[u8]>>(source: T) -> EbmlCursor<T> {
-    EbmlCursor::new(source)
+pub fn parse_webm<'a, T: AsRef<[u8]> + ?Sized>(source: &'a T) -> EbmlCursor<&'a [u8]> {
+    EbmlCursor::new(source.as_ref())
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
