@@ -225,7 +225,7 @@ pub trait FromEbml<'b>: Sized {
     fn should_unwrap(element_id: u64) -> bool;
     fn decode(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
 
-    fn decode_element(bytes: &'b[u8]) -> Result<Option<(Self, usize)>, Error> {
+    fn decode_element<'a: 'b>(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, Error> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -263,7 +263,7 @@ pub trait FromEbml<'b>: Sized {
 pub trait EbmlEventSource<'a> {
     type Event: FromEbml<'a>;
     type Error;
-    fn poll_event(&mut self) -> Result<Async<Option<Self::Event>>, Self::Error>;
+    fn poll_event(&'a mut self) -> Result<Async<Option<Self::Event>>, Self::Error>;
 }
 
 #[cfg(test)]

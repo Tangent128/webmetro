@@ -47,7 +47,7 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmStream<S> {
         }
     }
 
-    pub fn poll_event2<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, ParsingError<S::Error>> {
+    pub fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, ParsingError<S::Error>> {
         // release buffer from previous event
         self.buffer.advance(self.last_read);
         self.last_read = 0;
@@ -71,20 +71,14 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmStream<S> {
     }
 }
 
-/*fn umm<'a, I: AsRef<[u8]>, S: Stream<Item = I>>(webm_stream: &'a mut WebmStream<S>)
- -> Result<Async<Option<WebmElement<'a>>>, ParsingError<S::Error>>
-{
-    return webmStream.poll_event();
-}*/
-
-/*impl<'a, I: AsRef<[u8]>, S: Stream<Item = I>> EbmlEventSource<'a> for WebmStream<S> {
+impl<'a, I: AsRef<[u8]>, S: Stream<Item = I>> EbmlEventSource<'a> for WebmStream<S> {
     type Event = WebmElement<'a>;
     type Error = ParsingError<S::Error>;
 
-    fn poll_event(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Self::Error> {
-        return self.poll_event2();
+    fn poll_event(&'a mut self) -> Result<Async<Option<Self::Event>>, Self::Error> {
+        return WebmStream::poll_event(&mut self);
     }
-}*/
+}
 
 #[cfg(test)]
 mod tests {

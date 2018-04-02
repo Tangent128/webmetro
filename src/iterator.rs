@@ -41,7 +41,7 @@ impl<'a, T: FromEbml<'a>> EbmlEventSource<'a> for EbmlIterator<'a, T> {
     type Event = T;
     type Error = Error;
 
-    fn poll_event(&mut self) -> Result<Async<Option<T>>, Error> {
+    fn poll_event(&'a mut self) -> Result<Async<Option<T>>, Error> {
         match Self::Event::decode_element(&self.slice[self.position..]) {
             Err(err) => Err(err),
             Ok(None) => Ok(Async::Ready(None)),
