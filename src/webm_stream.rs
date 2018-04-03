@@ -34,7 +34,7 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
                 return Ok(Async::NotReady);
             },
             Ok(Some((element, element_size))) => {
-                self.last_read += element_size;
+                self.last_read = element_size;
                 return Ok(Async::Ready(Some(element)))
             }
         };
