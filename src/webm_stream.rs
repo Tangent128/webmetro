@@ -11,15 +11,15 @@ pub enum ParsingError<E> {
     OtherError(E)
 }
 
-pub struct WebmStream<S> {
+pub struct WebmBuffer<S> {
     stream: S,
     buffer: BytesMut,
     last_read: usize
 }
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmStream<S> {
+impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
     pub fn new(stream: S) -> Self {
-        WebmStream {
+        WebmBuffer {
             stream: stream,
             buffer: BytesMut::new(),
             last_read: 0
@@ -71,11 +71,11 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmStream<S> {
     }
 }
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmEventSource for WebmStream<S> {
+impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmEventSource for WebmBuffer<S> {
     type Error = ParsingError<S::Error>;
 
     fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Self::Error> {
-        return WebmStream::poll_event(self);
+        return WebmBuffer::poll_event(self);
     }
 }
 
