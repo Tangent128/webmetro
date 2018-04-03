@@ -3,11 +3,12 @@ extern crate hyper;
 extern crate lab_ebml;
 
 use futures::future::FutureResult;
+use futures::stream::once;
 use futures::stream::repeat;
 use futures::stream::Stream;
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
 use lab_ebml::timecode_fixer::ChunkStream;
-use lab_ebml::webm::*;
+use lab_ebml::webm_stream::WebmBuffer;
 use hyper::{Get, StatusCode};
 use hyper::header::ContentType;
 use hyper::server::{Http, Request, Response, Service};
@@ -30,10 +31,10 @@ impl Service for WebmServer {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
                 let stream: BodyStream<Vec<u8>> = Box::new(
-                    repeat(()).take(10)
-                    .map(|()|
-                        parse_webm(SRC_FILE).chunk_webm()
-                    ).flatten()
+                    repeat(()).take(3)
+                    .map(|()| {
+                        WebmBuffer::new(once::<&[u8], ()>(Ok(SRC_FILE))).chunk_webm()
+                    }).flatten()
                     .fix_timecodes()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
