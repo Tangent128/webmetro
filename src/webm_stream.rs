@@ -28,12 +28,17 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
 
     pub fn try_decode(&mut self) -> Result<Async<Option<WebmElement>>, ParsingError<S::Error>> {
         match WebmElement::decode_element(&self.buffer) {
-            Err(err) => return Err(ParsingError::EbmlError(err)),
+            Err(err) => {
+                //println!("EBML error: {:?}", err);
+                return Err(ParsingError::EbmlError(err))
+            },
             Ok(None) => {
+                //println!("Need refill");
                 // need to refill buffer
                 return Ok(Async::NotReady);
             },
             Ok(Some((element, element_size))) => {
+                //println!("Parsed element: {:?}", element);
                 self.last_read = element_size;
                 return Ok(Async::Ready(Some(element)))
             }
@@ -63,6 +68,7 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
                 Ok(Async::Ready(Some(chunk))) => {
                     self.buffer.reserve(chunk.as_ref().len());
                     self.buffer.put_slice(chunk.as_ref());
+                    //println!("Read {} into Buffer", chunk.as_ref().len());
                     // ok can retry decoding now
                 }
                 Err(err) => return Err(ParsingError::OtherError(err))

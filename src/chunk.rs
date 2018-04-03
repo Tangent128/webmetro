@@ -50,7 +50,7 @@ impl AsRef<[u8]> for ClusterHead {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
     Headers {
         bytes: Arc<B>
