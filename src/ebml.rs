@@ -218,11 +218,11 @@ pub struct Ebml<Source> {
     pub source: Source
 }
 
-pub trait FromEbml<'b>: Sized {
+pub trait FromEbml<'a>: Sized {
     fn should_unwrap(element_id: u64) -> bool;
-    fn decode(element_id: u64, bytes: &'b[u8]) -> Result<Self, Error>;
+    fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, Error>;
 
-    fn decode_element<'a: 'b>(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, Error> {
+    fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, Error> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
