@@ -11,7 +11,7 @@ use futures::stream::repeat;
 use futures::stream::Stream;
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
 use lab_ebml::timecode_fixer::ChunkStream;
-use lab_ebml::webm_stream::WebmBuffer;
+use lab_ebml::stream_parser::StreamEbml;
 use hyper::{Get, StatusCode};
 use hyper::header::ContentType;
 use hyper::server::{Http, Request, Response, Service};
@@ -34,7 +34,7 @@ impl Service for WebmServer {
                 let stream: BodyStream<Vec<u8>> = Box::new(
                     repeat(()).take(3)
                     .map(|()| {
-                        WebmBuffer::new(once::<&[u8], ()>(Ok(SRC_FILE))).chunk_webm()
+                        once::<&[u8], ()>(Ok(SRC_FILE)).parse_ebml().chunk_webm()
                     }).flatten()
                     .fix_timecodes()
                     .map_err(|err| match err {
