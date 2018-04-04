@@ -214,11 +214,6 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
     output.write_all(&buffer.get_ref()[..])
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Ebml<Source> {
-    pub source: Source
-}
-
 pub trait FromEbml<'a>: Sized {
     /// Indicates if this tag's contents should be treated as a blob,
     /// or if the tag header should be reported as an event and with further

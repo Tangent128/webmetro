@@ -4,23 +4,13 @@ use ebml::EbmlEventSource;
 use ebml::FromEbml;
 use webm::WebmElement;
 
-pub struct EbmlCursor<'a> {
-    source: &'a [u8]
-}
+pub struct EbmlSlice<'a>(pub &'a [u8]);
 
-impl<'a> EbmlCursor<'a> {
-    pub fn new(source: &'a [u8]) -> Self {
-        EbmlCursor {
-            source
-        }
-    }
-}
-
-impl<'a> Iterator for EbmlCursor<'a> {
+impl<'a> Iterator for EbmlSlice<'a> {
     type Item = WebmElement<'a>;
 
     fn next(&mut self) -> Option<WebmElement<'a>> {
-        match WebmElement::check_space(self.source) {
+        match WebmElement::check_space(self.0) {
             Err(err) => {
                 None
             },
@@ -28,8 +18,8 @@ impl<'a> Iterator for EbmlCursor<'a> {
                 None
             },
             Ok(Some(element_size)) => {
-                let (element_data, rest) = self.source.split_at(element_size);
-                self.source = rest;
+                let (element_data, rest) = self.0.split_at(element_size);
+                self.0 = rest;
                 match WebmElement::decode_element(element_data) {
                     Err(err) => {
                         None
@@ -47,11 +37,11 @@ impl<'a> Iterator for EbmlCursor<'a> {
     }
 }
 
-impl<'b> EbmlEventSource for EbmlCursor<'b> {
+impl<'b> EbmlEventSource for EbmlSlice<'b> {
     type Error = EbmlError;
 
     fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, EbmlError> {
-        match T::check_space(self.source) {
+        match T::check_space(self.0) {
             Err(err) => {
                 Err(err)
             },
@@ -59,8 +49,8 @@ impl<'b> EbmlEventSource for EbmlCursor<'b> {
                 Ok(None)
             },
             Ok(Some(element_size)) => {
-                let (element_data, rest) = self.source.split_at(element_size);
-                self.source = rest;
+                let (element_data, rest) = self.0.split_at(element_size);
+                self.0 = rest;
                 match T::decode_element(element_data) {
                     Err(err) => {
                         Err(err)

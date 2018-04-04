@@ -1,7 +1,7 @@
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
 use bytes::{BigEndian, BufMut, ByteOrder};
 use ebml::*;
-use iterator::EbmlCursor;
+use iterator::EbmlSlice;
 
 const SEGMENT_ID: u64 = 0x08538067;
 const SEEK_HEAD_ID: u64 = 0x014D9B74;
@@ -12,8 +12,8 @@ const CLUSTER_ID: u64 = 0x0F43B675;
 const TIMECODE_ID: u64 = 0x67;
 const SIMPLE_BLOCK_ID: u64 = 0x23;
 
-pub fn parse_webm<'a, T: AsRef<[u8]> + ?Sized>(source: &'a T) -> EbmlCursor<'a> {
-    EbmlCursor::new(source.as_ref())
+pub fn parse_webm<'a, T: AsRef<[u8]> + ?Sized>(source: &'a T) -> EbmlSlice<'a> {
+    EbmlSlice(source.as_ref())
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
