@@ -3,7 +3,9 @@ use bytes::BufMut;
 use futures::Async;
 use futures::stream::Stream;
 
-use ebml::*;
+use ebml::EbmlError;
+use ebml::EbmlEventSource;
+use ebml::FromEbml;
 
 pub enum ParsingError<E> {
     EbmlError(EbmlError),

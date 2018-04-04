@@ -2,6 +2,9 @@ extern crate futures;
 extern crate hyper;
 extern crate lab_ebml;
 
+use std::env::args;
+use std::net::ToSocketAddrs;
+
 use futures::future::FutureResult;
 use futures::stream::once;
 use futures::stream::repeat;
@@ -12,8 +15,6 @@ use lab_ebml::webm_stream::WebmBuffer;
 use hyper::{Get, StatusCode};
 use hyper::header::ContentType;
 use hyper::server::{Http, Request, Response, Service};
-use std::env::args;
-use std::net::ToSocketAddrs;
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 

@@ -1,4 +1,5 @@
 use futures::Async;
+
 use ebml::EbmlError;
 use ebml::EbmlEventSource;
 use ebml::FromEbml;
