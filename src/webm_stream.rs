@@ -26,13 +26,13 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
         }
     }
 
-    pub fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, ParsingError<S::Error>> {
+    pub fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, ParsingError<S::Error>> {
         // release buffer from previous event
         self.buffer.advance(self.last_read);
         self.last_read = 0;
 
         loop {
-            match WebmElement::check_space(&self.buffer) {
+            match T::check_space(&self.buffer) {
                 Err(err) => {
                     return Err(ParsingError::EbmlError(err))
                 },
@@ -40,7 +40,7 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
                     // need to refill buffer, below
                 },
                 Ok(Some(_)) => {
-                    return match WebmElement::decode_element(&self.buffer) {
+                    return match T::decode_element(&self.buffer) {
                         Err(err) => {
                             Err(ParsingError::EbmlError(err))
                         },
