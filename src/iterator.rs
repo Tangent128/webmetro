@@ -1,47 +1,79 @@
 use futures::Async;
 use ebml::Error as EbmlError;
+use ebml::EbmlEventSource;
 use ebml::FromEbml;
-use webm::*;
+use webm::WebmElement;
 
-pub struct EbmlCursor<T> {
-    source: T,
-    position: usize
+pub struct EbmlCursor<'a> {
+    source: &'a [u8]
 }
 
-impl<S> EbmlCursor<S> {
-    pub fn new(source: S) -> Self {
+impl<'a> EbmlCursor<'a> {
+    pub fn new(source: &'a [u8]) -> Self {
         EbmlCursor {
-            source,
-            position: 0
+            source
         }
     }
 }
 
-impl<'a> EbmlCursor<&'a [u8]> {
-    fn decode_element<T: FromEbml<'a>>(&mut self) -> Result<Option<T>, EbmlError> {
-        match T::decode_element(&self.source.as_ref()[self.position..]) {
-            Err(err) => Err(err),
-            Ok(None) => Ok(None),
-            Ok(Some((element, element_size))) => {
-                self.position += element_size;
-                Ok(Some(element))
+impl<'a> Iterator for EbmlCursor<'a> {
+    type Item = WebmElement<'a>;
+
+    fn next(&mut self) -> Option<WebmElement<'a>> {
+        match WebmElement::check_space(self.source) {
+            Err(err) => {
+                None
+            },
+            Ok(None) => {
+                None
+            },
+            Ok(Some(element_size)) => {
+                let (element_data, rest) = self.source.split_at(element_size);
+                self.source = rest;
+                match WebmElement::decode_element(element_data) {
+                    Err(err) => {
+                        None
+                    },
+                    Ok(None) => {
+                        // buffer should have enough data
+                        panic!("Buffer was supposed to have enough data to parse element, somehow did not.")
+                    },
+                    Ok(Some((element, _))) => {
+                        Some(element)
+                    }
+                }
             }
         }
     }
 }
 
-impl<'a> Iterator for EbmlCursor<&'a [u8]> {
-    type Item = WebmElement<'a>;
-
-    fn next(&mut self) -> Option<WebmElement<'a>> {
-        self.decode_element().unwrap_or(None)
-    }
-}
-
-impl<'b> WebmEventSource for EbmlCursor<&'b [u8]> {
+impl<'b> EbmlEventSource for EbmlCursor<'b> {
     type Error = EbmlError;
 
-    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, EbmlError> {
-        self.decode_element().map(Async::Ready)
+    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, EbmlError> {
+        match T::check_space(self.source) {
+            Err(err) => {
+                Err(err)
+            },
+            Ok(None) => {
+                Ok(None)
+            },
+            Ok(Some(element_size)) => {
+                let (element_data, rest) = self.source.split_at(element_size);
+                self.source = rest;
+                match T::decode_element(element_data) {
+                    Err(err) => {
+                        Err(err)
+                    },
+                    Ok(None) => {
+                        // buffer should have enough data
+                        panic!("Buffer was supposed to have enough data to parse element, somehow did not.")
+                    },
+                    Ok(Some((element, _))) => {
+                        Ok(Some(element))
+                    }
+                }
+            }
+        }.map(Async::Ready)
     }
 }

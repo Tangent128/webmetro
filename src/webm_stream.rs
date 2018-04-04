@@ -4,7 +4,6 @@ use futures::Async;
 use futures::stream::Stream;
 
 use ebml::*;
-use webm::*;
 
 pub enum ParsingError<E> {
     EbmlError(::ebml::Error),
@@ -71,10 +70,10 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
     }
 }
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmEventSource for WebmBuffer<S> {
+impl<I: AsRef<[u8]>, S: Stream<Item = I>> EbmlEventSource for WebmBuffer<S> {
     type Error = ParsingError<S::Error>;
 
-    fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, Self::Error> {
+    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, Self::Error> {
         return WebmBuffer::poll_event(self);
     }
 }
