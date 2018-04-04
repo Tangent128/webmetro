@@ -33,8 +33,8 @@ impl ClusterHead {
         self.end = self.start + delta;
         let mut cursor = Cursor::new(self.bytes.as_mut());
         // buffer is sized so these should never fail
-        encode_webm_element(&WebmElement::Cluster, &mut cursor).unwrap();
-        encode_webm_element(&WebmElement::Timecode(timecode), &mut cursor).unwrap();
+        encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
+        encode_webm_element(WebmElement::Timecode(timecode), &mut cursor).unwrap();
         self.bytes_used = cursor.position() as u8;
     }
     pub fn observe_simpleblock_timecode(&mut self, timecode: i16) {
@@ -120,7 +120,7 @@ impl<'a, S: EbmlEventSource> Stream for WebmChunker<S>
                         Ok(Async::Ready(Some(WebmElement::Info))) => continue,
                         Ok(Async::Ready(Some(WebmElement::Void))) => continue,
                         Ok(Async::Ready(Some(element @ _))) => {
-                            match encode_webm_element(&element, buffer) {
+                            match encode_webm_element(element, buffer) {
                                 Ok(_) => continue,
                                 Err(err) => (
                                     Err(ChunkingError::IoError(err)),
@@ -152,7 +152,7 @@ impl<'a, S: EbmlEventSource> Stream for WebmChunker<S>
                                 cluster_head.keyframe = true;
                             }
                             cluster_head.observe_simpleblock_timecode(block.timecode);
-                            match encode_webm_element(&WebmElement::SimpleBlock(*block), buffer) {
+                            match encode_webm_element(WebmElement::SimpleBlock(*block), buffer) {
                                 Ok(_) => continue,
                                 Err(err) => (
                                     Err(ChunkingError::IoError(err)),
@@ -164,7 +164,7 @@ impl<'a, S: EbmlEventSource> Stream for WebmChunker<S>
                         Ok(Async::Ready(Some(WebmElement::Void))) => continue,
                         Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => continue,
                         Ok(Async::Ready(Some(element @ _))) => {
-                            match encode_webm_element(&element, buffer) {
+                            match encode_webm_element(element, buffer) {
                                 Ok(_) => continue,
                                 Err(err) => (
                                     Err(ChunkingError::IoError(err)),

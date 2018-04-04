@@ -37,15 +37,15 @@ pub fn main() {
     let mut fixer = TimecodeFixer::new();
 
     for element in &head {
-        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
+        encode_webm_element(fixer.process(element), &mut cursor).unwrap();
     }
 
     for element in &body {
-        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
+        encode_webm_element(fixer.process(element), &mut cursor).unwrap();
     }
 
     for element in &body {
-        encode_webm_element(&fixer.process(element), &mut cursor).unwrap();
+        encode_webm_element(fixer.process(element), &mut cursor).unwrap();
     }
 
     output = cursor.into_inner();
