@@ -6,7 +6,7 @@ use futures::stream::Stream;
 use ebml::*;
 
 pub enum ParsingError<E> {
-    EbmlError(::ebml::Error),
+    EbmlError(EbmlError),
     OtherError(E)
 }
 

@@ -9,7 +9,7 @@ pub const DOC_TYPE_ID: u64 = 0x0282;
 pub const VOID_ID: u64 = 0x6C;
 
 #[derive(Debug, PartialEq)]
-pub enum Error {
+pub enum EbmlError {
     CorruptVarint,
     UnknownElementId,
     UnknownElementLength,
@@ -48,7 +48,7 @@ pub enum Varint {
 /// Returns Ok(None) if more bytes are needed to get a result.
 /// Returns Ok(Some((varint, size))) to return a varint value and
 /// the size of the parsed varint.
-pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
+pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, EbmlError> {
     let mut value: u64 = 0;
     let mut value_length = 1;
     let mut mask: u8 = 0x80;
@@ -70,7 +70,7 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
     }
 
     if mask == 0 {
-        return Err(Error::CorruptVarint)
+        return Err(EbmlError::CorruptVarint)
     }
 
     // check we have enough data to parse
@@ -97,12 +97,12 @@ pub fn decode_varint(bytes: &[u8]) -> Result<Option<(Varint, usize)>, Error> {
 /// Returns Ok(None) if more bytes are needed to get a result.
 /// Returns Ok(Some((id, varint, size))) to return the element id,
 /// the size of the payload, and the size of the parsed header.
-pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
+pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, EbmlError> {
     // parse element ID
     match decode_varint(bytes) {
         Ok(None) => Ok(None),
         Err(err) => Err(err),
-        Ok(Some((Varint::Unknown, _))) => Err(Error::UnknownElementId),
+        Ok(Some((Varint::Unknown, _))) => Err(EbmlError::UnknownElementId),
         Ok(Some((Varint::Value(element_id), id_size))) => {
             // parse payload size
             match decode_varint(&bytes[id_size..]) {
@@ -119,9 +119,9 @@ pub fn decode_tag(bytes: &[u8]) -> Result<Option<(u64, Varint, usize)>, Error> {
     }
 }
 
-pub fn decode_uint(bytes: &[u8]) -> Result<u64, Error> {
+pub fn decode_uint(bytes: &[u8]) -> Result<u64, EbmlError> {
     if bytes.len() < 1 || bytes.len() > 8 {
-        return Err(Error::CorruptPayload);
+        return Err(EbmlError::CorruptPayload);
     }
 
     Ok(BigEndian::read_uint(bytes, bytes.len()))
@@ -225,11 +225,11 @@ pub trait FromEbml<'a>: Sized {
     /// Given an element's ID and its binary payload, if any, construct a suitable
     /// instance of this type to represent the event. The instance may contain
     /// references into the given buffer.
-    fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, Error>;
+    fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, EbmlError>;
 
     /// Check if enough space exists in the given buffer for decode_element() to
     /// be successful; parsing errors will be returned eagerly.
-    fn check_space(bytes: &[u8]) -> Result<Option<usize>, Error> {
+    fn check_space(bytes: &[u8]) -> Result<Option<usize>, EbmlError> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -238,7 +238,7 @@ pub trait FromEbml<'a>: Sized {
 
                 let payload_size = match (should_unwrap, payload_size_tag) {
                     (true, _) => 0,
-                    (false, Varint::Unknown) => return Err(Error::UnknownElementLength),
+                    (false, Varint::Unknown) => return Err(EbmlError::UnknownElementLength),
                     (false, Varint::Value(size)) => size as usize
                 };
 
@@ -254,7 +254,7 @@ pub trait FromEbml<'a>: Sized {
     }
 
     /// Attempt to construct an instance of this type from the given byte slice
-    fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, Error> {
+    fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, EbmlError> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -263,7 +263,7 @@ pub trait FromEbml<'a>: Sized {
 
                 let payload_size = match (should_unwrap, payload_size_tag) {
                     (true, _) => 0,
-                    (false, Varint::Unknown) => return Err(Error::UnknownElementLength),
+                    (false, Varint::Unknown) => return Err(EbmlError::UnknownElementLength),
                     (false, Varint::Value(size)) => size as usize
                 };
 
@@ -291,7 +291,7 @@ pub trait EbmlEventSource {
 mod tests {
     use bytes::{BytesMut};
     use ebml::*;
-    use ebml::Error::{CorruptVarint, UnknownElementId};
+    use ebml::EbmlError::{CorruptVarint, UnknownElementId};
     use ebml::Varint::{Unknown, Value};
     use std::io::Cursor;
     use tests::TEST_FILE;
@@ -414,8 +414,8 @@ mod tests {
 
     #[test]
     fn bad_uints() {
-        assert_eq!(decode_uint(&[]), Err(Error::CorruptPayload));
-        assert_eq!(decode_uint(&[0; 9]), Err(Error::CorruptPayload));
+        assert_eq!(decode_uint(&[]), Err(EbmlError::CorruptPayload));
+        assert_eq!(decode_uint(&[0; 9]), Err(EbmlError::CorruptPayload));
     }
 
     #[test]
@@ -441,7 +441,7 @@ mod tests {
             }
         }
 
-        fn decode(element_id: u64, bytes: &'a[u8]) -> Result<GenericElement, Error> {
+        fn decode(element_id: u64, bytes: &'a[u8]) -> Result<GenericElement, EbmlError> {
             match element_id {
                 _ => Ok(GenericElement(element_id, bytes.len()))
             }

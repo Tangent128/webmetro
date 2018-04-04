@@ -1,5 +1,5 @@
 use futures::Async;
-use ebml::Error as EbmlError;
+use ebml::EbmlError;
 use ebml::EbmlEventSource;
 use ebml::FromEbml;
 use webm::WebmElement;

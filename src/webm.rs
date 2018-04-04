@@ -49,7 +49,7 @@ impl<'b> FromEbml<'b> for WebmElement<'b> {
         }
     }
 
-    fn decode(element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, Error> {
+    fn decode(element_id: u64, bytes: &'b[u8]) -> Result<WebmElement<'b>, EbmlError> {
         match element_id {
             EBML_HEAD_ID => Ok(WebmElement::EbmlHead),
             VOID_ID => Ok(WebmElement::Void),
@@ -66,11 +66,11 @@ impl<'b> FromEbml<'b> for WebmElement<'b> {
     }
 }
 
-fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
+fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, EbmlError> {
     if let Ok(Some((Varint::Value(track), track_field_len))) = decode_varint(bytes) {
         let header_len = track_field_len + 2 + 1;
         if bytes.len() < header_len {
-            return Err(Error::CorruptPayload);
+            return Err(EbmlError::CorruptPayload);
         }
         let timecode = BigEndian::read_i16(&bytes[track_field_len..]);
         let flags = bytes[track_field_len + 2];
@@ -81,7 +81,7 @@ fn decode_simple_block(bytes: &[u8]) -> Result<WebmElement, Error> {
             data: &bytes[header_len..],
         }))
     } else {
-        return Err(Error::CorruptPayload);
+        return Err(EbmlError::CorruptPayload);
     }
 }
 

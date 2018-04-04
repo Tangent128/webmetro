@@ -9,7 +9,7 @@ pub mod webm_stream;
 pub mod timecode_fixer;
 pub mod webm;
 
-pub use ebml::{Error, FromEbml};
+pub use ebml::{EbmlError, FromEbml};
 
 #[cfg(test)]
 mod tests {
