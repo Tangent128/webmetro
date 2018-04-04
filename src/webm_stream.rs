@@ -26,40 +26,34 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> WebmBuffer<S> {
         }
     }
 
-    pub fn try_decode(&mut self) -> Result<Async<Option<WebmElement>>, ParsingError<S::Error>> {
-        match WebmElement::decode_element(&self.buffer) {
-            Err(err) => {
-                //println!("EBML error: {:?}", err);
-                return Err(ParsingError::EbmlError(err))
-            },
-            Ok(None) => {
-                //println!("Need refill");
-                // need to refill buffer
-                return Ok(Async::NotReady);
-            },
-            Ok(Some((element, element_size))) => {
-                //println!("Parsed element: {:?}", element);
-                self.last_read = element_size;
-                return Ok(Async::Ready(Some(element)))
-            }
-        };
-    }
-
-    pub fn can_decode(&mut self) -> bool {
-        match self.try_decode() {
-            Ok(Async::NotReady) => false,
-            _ => true
-        }
-    }
-
     pub fn poll_event<'a>(&'a mut self) -> Result<Async<Option<WebmElement<'a>>>, ParsingError<S::Error>> {
         // release buffer from previous event
         self.buffer.advance(self.last_read);
         self.last_read = 0;
 
         loop {
-            if self.can_decode() {
-                return self.try_decode()
+            match WebmElement::check_space(&self.buffer) {
+                Err(err) => {
+                    return Err(ParsingError::EbmlError(err))
+                },
+                Ok(None) => {
+                    // need to refill buffer, below
+                },
+                Ok(Some(_)) => {
+                    return match WebmElement::decode_element(&self.buffer) {
+                        Err(err) => {
+                            Err(ParsingError::EbmlError(err))
+                        },
+                        Ok(None) => {
+                            // buffer should have the data already
+                            panic!("Buffer was supposed to have enough data to parse element, somehow did not.")
+                        },
+                        Ok(Some((element, element_size))) => {
+                            self.last_read = element_size;
+                            return Ok(Async::Ready(Some(element)))
+                        }
+                    }
+                }
             }
 
             match self.stream.poll() {

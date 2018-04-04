@@ -219,9 +219,45 @@ pub struct Ebml<Source> {
 }
 
 pub trait FromEbml<'a>: Sized {
+    /// Indicates if this tag's contents should be treated as a blob,
+    /// or if the tag header should be reported as an event and with further
+    /// parsing descending into its content.
+    ///
+    /// Unknown-size tags can *only* be parsed if unwrapped, and will error otherwise.
     fn should_unwrap(element_id: u64) -> bool;
+
+    /// Given an element's ID and its binary payload, if any, construct a suitable
+    /// instance of this type to represent the event. The instance may contain
+    /// references into the given buffer.
     fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, Error>;
 
+    /// Check if enough space exists in the given buffer for decode_element() to
+    /// be successful; parsing errors will be returned eagerly.
+    fn check_space(bytes: &[u8]) -> Result<Option<usize>, Error> {
+        match decode_tag(bytes) {
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+            Ok(Some((element_id, payload_size_tag, tag_size))) => {
+                let should_unwrap = Self::should_unwrap(element_id);
+
+                let payload_size = match (should_unwrap, payload_size_tag) {
+                    (true, _) => 0,
+                    (false, Varint::Unknown) => return Err(Error::UnknownElementLength),
+                    (false, Varint::Value(size)) => size as usize
+                };
+
+                let element_size = tag_size + payload_size;
+                if element_size > bytes.len() {
+                    // need to read more still
+                    Ok(None)
+                } else {
+                    Ok(Some(element_size))
+                }
+            }
+        }
+    }
+
+    /// Attempt to construct an instance of this type from the given byte slice
     fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, Error> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
