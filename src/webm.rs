@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn decode_webm_test1() {
-        let mut iter = parse_webm(TEST_FILE).into_iter();
+        let mut iter = parse_webm(TEST_FILE);
 
         // test that we match the structure of the test file
         assert_eq!(iter.next(), Some(WebmElement::EbmlHead));
