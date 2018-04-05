@@ -93,7 +93,7 @@ pub struct WebmChunker<S> {
     state: ChunkerState
 }
 
-impl<'a, S: EbmlEventSource> Stream for WebmChunker<S>
+impl<S: EbmlEventSource> Stream for WebmChunker<S>
 {
     type Item = Chunk;
     type Error = ChunkingError<S::Error>;
