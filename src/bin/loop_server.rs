@@ -10,7 +10,7 @@ use futures::stream::once;
 use futures::stream::repeat;
 use futures::stream::Stream;
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
-use lab_ebml::timecode_fixer::ChunkStream;
+use lab_ebml::fixers::ChunkStream;
 use lab_ebml::stream_parser::StreamEbml;
 use hyper::{Get, StatusCode};
 use hyper::header::ContentType;

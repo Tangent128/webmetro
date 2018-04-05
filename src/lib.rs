@@ -2,13 +2,13 @@
 extern crate bytes;
 extern crate futures;
 
-pub mod chunk;
 pub mod ebml;
-mod iterator;
+pub mod iterator;
 pub mod slice;
 pub mod stream_parser;
 
-pub mod timecode_fixer;
+pub mod chunk;
+pub mod fixers;
 pub mod webm;
 
 pub use ebml::{EbmlError, FromEbml};
