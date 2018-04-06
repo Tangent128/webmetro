@@ -6,7 +6,6 @@ use std::env::args;
 use std::net::ToSocketAddrs;
 
 use futures::future::FutureResult;
-use futures::stream::once;
 use futures::stream::repeat;
 use futures::stream::Stream;
 use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
@@ -32,11 +31,8 @@ impl Service for WebmServer {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
                 let stream: BodyStream<Vec<u8>> = Box::new(
-                    repeat(()).take(3)
-                    .map(|()| {
-                        once::<&[u8], ()>(Ok(SRC_FILE)).parse_ebml().chunk_webm()
-                    }).flatten()
-                    .fix_timecodes()
+                    repeat::<&[u8], ()>(SRC_FILE).take(5)
+                    .parse_ebml().chunk_webm().fix_timecodes()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
                         ChunkingError::OtherError(_) => hyper::Error::Incomplete
