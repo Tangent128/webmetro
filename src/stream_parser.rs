@@ -18,12 +18,8 @@ pub struct EbmlStreamingParser<S> {
     last_read: usize
 }
 
-pub trait StreamEbml<I: AsRef<[u8]>, S: Stream<Item = I>> {
-    fn parse_ebml(self) -> EbmlStreamingParser<S>;
-}
-
-impl<I: AsRef<[u8]>, S: Stream<Item = I>> StreamEbml<I, S> for S {
-    fn parse_ebml(self) -> EbmlStreamingParser<S> {
+pub trait StreamEbml where Self: Sized + Stream, Self::Item: AsRef<[u8]> {
+    fn parse_ebml(self) -> EbmlStreamingParser<Self> {
         EbmlStreamingParser {
             stream: self,
             buffer: BytesMut::new(),
@@ -31,6 +27,8 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I>> StreamEbml<I, S> for S {
         }
     }
 }
+
+impl<I: AsRef<[u8]>, S: Stream<Item = I>> StreamEbml for S {}
 
 impl<I: AsRef<[u8]>, S: Stream<Item = I>> EbmlStreamingParser<S> {
     pub fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, ParsingError<S::Error>> {

@@ -42,12 +42,8 @@ impl<S: Stream<Item = Chunk>> Stream for ChunkTimecodeFixer<S>
     }
 }
 
-pub trait ChunkStream<T> {
-    fn fix_timecodes(self) -> ChunkTimecodeFixer<T>;
-}
-
-impl<T: Stream<Item = Chunk>> ChunkStream<T> for T {
-    fn fix_timecodes(self) -> ChunkTimecodeFixer<T> {
+pub trait ChunkStream where Self : Sized + Stream<Item = Chunk> {
+    fn fix_timecodes(self) -> ChunkTimecodeFixer<Self> {
         ChunkTimecodeFixer {
             stream: self,
             current_offset: 0,
@@ -57,3 +53,5 @@ impl<T: Stream<Item = Chunk>> ChunkStream<T> for T {
         }
     }
 }
+
+impl<T: Stream<Item = Chunk>> ChunkStream for T {}

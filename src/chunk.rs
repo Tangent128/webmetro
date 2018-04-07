@@ -242,18 +242,16 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
     }
 }
 
-pub trait WebmStream<T: EbmlEventSource> {
-    fn chunk_webm(self) -> WebmChunker<T>;
-}
-
-impl<'a, T: EbmlEventSource> WebmStream<T> for T {
-    fn chunk_webm(self) -> WebmChunker<T> {
+pub trait WebmStream where Self: Sized + EbmlEventSource {
+    fn chunk_webm(self) -> WebmChunker<Self> {
         WebmChunker {
             source: self,
             state: ChunkerState::BuildingHeader(Cursor::new(Vec::new()))
         }
     }
 }
+
+impl<T: EbmlEventSource> WebmStream for T {}
 
 #[cfg(test)]
 mod tests {
