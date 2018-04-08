@@ -32,7 +32,7 @@ impl Service for WebmServer {
             (&Get, "/loop") => {
                 let stream: BodyStream<Vec<u8>> = Box::new(
                     repeat::<&[u8], ()>(SRC_FILE).take(5)
-                    .parse_ebml().chunk_webm().fix_timecodes()
+                    .parse_ebml().chunk_webm().fix_timecodes().find_starting_point()
                     .map_err(|err| match err {
                         ChunkingError::IoError(io_err) => hyper::Error::Io(io_err),
                         ChunkingError::OtherError(_) => hyper::Error::Incomplete
