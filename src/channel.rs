@@ -18,6 +18,8 @@ use odds::vec::VecExt;
 
 use chunk::Chunk;
 
+pub enum Never {}
+
 /// A collection of listeners to a stream of WebM chunks.
 /// Sending a chunk may fail due to a client being disconnected,
 /// or simply failing to keep up with the stream buffer. In either
@@ -41,11 +43,19 @@ pub struct Transmitter {
     channel: Arc<Mutex<Channel>>
 }
 
+impl Transmitter {
+    pub fn new(channel_arc: Arc<Mutex<Channel>>) -> Self {
+        Transmitter {
+            channel: channel_arc
+        }
+    }
+}
+
 impl Sink for Transmitter {
     type SinkItem = Chunk;
-    type SinkError = (); // never errors, slow clients are simply dropped
+    type SinkError = Never; // never errors, slow clients are simply dropped
 
-    fn start_send(&mut self, chunk: Chunk) -> Result<AsyncSink<Chunk>, ()> {
+    fn start_send(&mut self, chunk: Chunk) -> Result<AsyncSink<Chunk>, Never> {
         let mut channel = self.channel.lock().expect("Locking channel");
 
         if let Chunk::Headers { .. } = chunk {
@@ -56,7 +66,7 @@ impl Sink for Transmitter {
 
         Ok(AsyncSink::Ready)
     }
-    fn poll_complete(&mut self) -> Result<Async<()>, ()> {
+    fn poll_complete(&mut self) -> Result<Async<()>, Never> {
         let mut channel = self.channel.lock().expect("Locking channel");
 
         channel.listeners.retain_mut(|listener| listener.poll_complete().is_ok());
@@ -94,9 +104,9 @@ impl Listener {
 
 impl Stream for Listener {
     type Item = Chunk;
-    type Error = (); // no transmitter errors are exposed to the listeners
+    type Error = Never; // no transmitter errors are exposed to the listeners
 
-    fn poll(&mut self) -> Result<Async<Option<Chunk>>, ()> {
-        self.receiver.poll()
+    fn poll(&mut self) -> Result<Async<Option<Chunk>>, Never> {
+        Ok(self.receiver.poll().expect("Channel receiving can't error"))
     }
 }
