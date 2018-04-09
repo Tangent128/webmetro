@@ -52,17 +52,17 @@ impl AsRef<[u8]> for ClusterHead {
 }
 
 #[derive(Clone, Debug)]
-pub enum Chunk<B: AsRef<[u8]> = Vec<u8>> {
+pub enum Chunk {
     Headers {
-        bytes: Arc<B>
+        bytes: Arc<Vec<u8>>
     },
     ClusterHead(ClusterHead),
     ClusterBody {
-        bytes: Arc<B>
+        bytes: Arc<Vec<u8>>
     }
 }
 
-impl<B: AsRef<[u8]>> AsRef<[u8]> for Chunk<B> {
+impl AsRef<[u8]> for Chunk {
     fn as_ref(&self) -> &[u8] {
         match self {
             &Chunk::Headers {ref bytes, ..} => bytes.as_ref().as_ref(),

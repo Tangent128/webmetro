@@ -20,17 +20,17 @@ const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 #[derive(Clone)]
 struct WebmServer;
 
-type BodyStream<B> = Box<Stream<Item = Chunk<B>, Error = hyper::Error>>;
+type BodyStream = Box<Stream<Item = Chunk, Error = hyper::Error>>;
 
 impl Service for WebmServer {
     type Request = Request;
-    type Response = Response<BodyStream<Vec<u8>>>;
+    type Response = Response<BodyStream>;
     type Error = hyper::Error;
     type Future = FutureResult<Self::Response, hyper::Error>;
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
-                let stream: BodyStream<Vec<u8>> = Box::new(
+                let stream: BodyStream = Box::new(
                     repeat::<&[u8], ()>(SRC_FILE).take(5)
                     .parse_ebml().chunk_webm().fix_timecodes().find_starting_point()
                     .map_err(|err| match err {
