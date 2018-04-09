@@ -1,6 +1,7 @@
 
 extern crate bytes;
 extern crate futures;
+extern crate odds;
 
 pub mod ebml;
 pub mod iterator;
@@ -10,6 +11,8 @@ pub mod stream_parser;
 pub mod chunk;
 pub mod fixers;
 pub mod webm;
+
+pub mod channel;
 
 pub use ebml::{EbmlError, FromEbml};
 
