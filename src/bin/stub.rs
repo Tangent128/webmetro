@@ -1,7 +1,7 @@
-extern crate lab_ebml;
+extern crate webmetro;
 
 use std::io::{Cursor, stdout, Write};
-use lab_ebml::webm::*;
+use webmetro::webm::*;
 
 pub fn main() {
     let mut cursor = Cursor::new(Vec::new());

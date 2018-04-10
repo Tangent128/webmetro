@@ -1,8 +1,9 @@
-extern crate lab_ebml;
+extern crate webmetro;
 
 use std::io::{Cursor, stdout, Write};
-use lab_ebml::webm::*;
-use lab_ebml::webm::WebmElement::*;
+
+use webmetro::webm::*;
+use webmetro::webm::WebmElement::*;
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 

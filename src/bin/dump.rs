@@ -1,11 +1,11 @@
-extern crate lab_ebml;
+extern crate webmetro;
 
 use std::env::args;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use lab_ebml::webm::{ parse_webm, SimpleBlock };
-use lab_ebml::webm::WebmElement::*;
+use webmetro::webm::{ parse_webm, SimpleBlock };
+use webmetro::webm::WebmElement::*;
 
 pub fn main() {
     let mut args = args();

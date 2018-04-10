@@ -1,6 +1,6 @@
 extern crate futures;
 extern crate hyper;
-extern crate lab_ebml;
+extern crate webmetro;
 
 use std::env::args;
 use std::io::ErrorKind;
@@ -20,16 +20,6 @@ use futures::{
     },
     stream::empty
 };
-use lab_ebml::{
-    channel::{
-        Channel,
-        Listener,
-        Transmitter
-    },
-    chunk::{Chunk, WebmStream, ChunkingError},
-    fixers::ChunkStream,
-    stream_parser::StreamEbml
-};
 use hyper::{
     Error as HyperError,
     Get,
@@ -38,6 +28,16 @@ use hyper::{
     StatusCode,
     header::ContentType,
     server::{Http, Request, Response, Service}
+};
+use webmetro::{
+    channel::{
+        Channel,
+        Listener,
+        Transmitter
+    },
+    chunk::{Chunk, WebmStream, ChunkingError},
+    fixers::ChunkStream,
+    stream_parser::StreamEbml
 };
 
 type BodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;

@@ -1,6 +1,6 @@
 extern crate futures;
 extern crate hyper;
-extern crate lab_ebml;
+extern crate webmetro;
 
 use std::env::args;
 use std::net::ToSocketAddrs;
@@ -8,12 +8,12 @@ use std::net::ToSocketAddrs;
 use futures::future::FutureResult;
 use futures::stream::repeat;
 use futures::stream::Stream;
-use lab_ebml::chunk::{Chunk, WebmStream, ChunkingError};
-use lab_ebml::fixers::ChunkStream;
-use lab_ebml::stream_parser::StreamEbml;
 use hyper::{Get, StatusCode};
 use hyper::header::ContentType;
 use hyper::server::{Http, Request, Response, Service};
+use webmetro::chunk::{Chunk, WebmStream, ChunkingError};
+use webmetro::fixers::ChunkStream;
+use webmetro::stream_parser::StreamEbml;
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 
