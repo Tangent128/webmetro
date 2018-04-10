@@ -17,16 +17,16 @@ use hyper::server::{Http, Request, Response, Service};
 
 const SRC_FILE: &'static [u8] = include_bytes!("../data/test1.webm");
 
-#[derive(Clone)]
-struct WebmServer;
+struct LoopServer;
 
 type BodyStream = Box<Stream<Item = Chunk, Error = hyper::Error>>;
 
-impl Service for WebmServer {
+impl Service for LoopServer {
     type Request = Request;
     type Response = Response<BodyStream>;
     type Error = hyper::Error;
     type Future = FutureResult<Self::Response, hyper::Error>;
+
     fn call(&self, req: Request) -> Self::Future {
         let response = match (req.method(), req.path()) {
             (&Get, "/loop") => {
@@ -53,5 +53,5 @@ impl Service for WebmServer {
 
 pub fn main() {
     let addr = args().nth(1).expect("Need binding address+port").to_socket_addrs().unwrap().next().unwrap();
-    Http::new().bind(&addr, move || Ok(WebmServer)).unwrap().run().unwrap();
+    Http::new().bind(&addr, move || Ok(LoopServer)).unwrap().run().unwrap();
 }
