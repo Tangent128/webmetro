@@ -7,6 +7,7 @@ use ebml::EbmlError;
 use ebml::EbmlEventSource;
 use ebml::FromEbml;
 
+#[derive(Debug)]
 pub enum ParsingError<E> {
     EbmlError(EbmlError),
     OtherError(E)
