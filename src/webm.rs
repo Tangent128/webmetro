@@ -123,7 +123,9 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
         WebmElement::Cluster => encode_tag_header(CLUSTER_ID, Varint::Unknown, output),
         WebmElement::Timecode(time) => encode_integer(TIMECODE_ID, time, output),
         WebmElement::SimpleBlock(block) => encode_simple_block(block, output),
-        _ => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
+        WebmElement::Void => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange)),
+        WebmElement::Info => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange)),
+        WebmElement::Unknown(_) => Err(IoError::new(ErrorKind::InvalidInput, WriteError::OutOfRange))
     }
 }
 
