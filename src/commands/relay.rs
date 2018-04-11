@@ -21,6 +21,7 @@ use hyper::{
     Get,
     Head,
     Post,
+    Put,
     StatusCode,
     header::ContentType,
     server::{Http, Request, Response, Service}
@@ -96,7 +97,7 @@ impl Service for RelayServer {
                     .with_header(ContentType("video/webm".parse().unwrap()))
                     .with_body(self.get_stream())
             },
-            (Post, "/live") => {
+            (Post, "/live") | (Put, "/live") => {
                 Response::new()
                     .with_body(self.post_stream(request_body))
             },
