@@ -109,7 +109,7 @@ impl Service for RelayServer {
     }
 }
 
-pub fn args() -> App<'static, 'static> {
+pub fn options() -> App<'static, 'static> {
     SubCommand::with_name("relay")
         .about("Hosts an HTTP-based relay server")
         .arg(Arg::with_name("listen")

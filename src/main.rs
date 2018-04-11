@@ -8,17 +8,22 @@ mod commands;
 use clap::{App, AppSettings};
 use commands::{relay};
 
-fn main() {
-    let args = App::new("webmetro")
+fn options() -> App<'static, 'static> {
+    App::new("webmetro")
         .version(crate_version!())
         .about("Utilities for broadcasting & relaying live WebM video/audio streams")
-        .setting(AppSettings::SubcommandRequired)
         .setting(AppSettings::VersionlessSubcommands)
-        .subcommand(relay::args())
-        .get_matches();
+        .subcommand(relay::options())
+}
+
+fn main() {
+    let args = options().get_matches();
 
     match args.subcommand() {
         ("relay", Some(sub_args)) => relay::run(sub_args),
-        _ => {}
+        _ => {
+            options().print_help().unwrap();
+            println!("")
+        }
     }
 }
