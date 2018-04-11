@@ -1,8 +1,3 @@
-extern crate futures;
-extern crate hyper;
-extern crate webmetro;
-
-use std::env::args;
 use std::io::ErrorKind;
 use std::net::ToSocketAddrs;
 use std::sync::{
@@ -10,6 +5,7 @@ use std::sync::{
     Mutex
 };
 
+use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
     Future,
     Stream,
@@ -112,8 +108,19 @@ impl Service for RelayServer {
     }
 }
 
-pub fn main() {
+pub fn args() -> App<'static, 'static> {
+    SubCommand::with_name("relay")
+        .about("Hosts an HTTP-based relay server")
+        .arg(Arg::with_name("listen")
+            .help("The address:port to listen to")
+            .required(true))
+}
+
+pub fn run(args: &ArgMatches) {
     let single_channel = Channel::new();
-    let addr = args().nth(1).expect("Need binding address+port").to_socket_addrs().unwrap().next().unwrap();
+
+    let addr_str = args.value_of("listen").unwrap();
+    let addr = addr_str.to_socket_addrs().expect("parsing bind address").next().expect("resolving bind address");
+
     Http::new().bind(&addr, move || Ok(RelayServer(single_channel.clone()))).unwrap().run().unwrap();
 }

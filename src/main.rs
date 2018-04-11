@@ -1,7 +1,12 @@
-#[macro_use]
-extern crate clap;
+#[macro_use] extern crate clap;
+extern crate futures;
+extern crate hyper;
+extern crate webmetro;
+
+mod commands;
 
 use clap::{App, AppSettings};
+use commands::{relay};
 
 fn main() {
     let args = App::new("webmetro")
@@ -9,9 +14,11 @@ fn main() {
         .about("Utilities for broadcasting & relaying live WebM video/audio streams")
         .setting(AppSettings::SubcommandRequired)
         .setting(AppSettings::VersionlessSubcommands)
+        .subcommand(relay::args())
         .get_matches();
 
     match args.subcommand() {
+        ("relay", Some(sub_args)) => relay::run(sub_args),
         _ => {}
     }
 }
