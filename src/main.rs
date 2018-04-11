@@ -23,7 +23,8 @@ fn main() {
         ("relay", Some(sub_args)) => relay::run(sub_args),
         _ => {
             options().print_help().unwrap();
-            println!("")
+            println!("");
+            Ok(())
         }
-    }
+    }.unwrap_or_else(|err| println!("Error: {}", err));
 }

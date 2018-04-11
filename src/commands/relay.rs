@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::io::ErrorKind;
 use std::net::ToSocketAddrs;
 use std::sync::{
@@ -117,11 +118,12 @@ pub fn options() -> App<'static, 'static> {
             .required(true))
 }
 
-pub fn run(args: &ArgMatches) {
+pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
     let single_channel = Channel::new();
 
-    let addr_str = args.value_of("listen").unwrap();
-    let addr = addr_str.to_socket_addrs().expect("parsing bind address").next().expect("resolving bind address");
+    let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
+    let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    Http::new().bind(&addr, move || Ok(RelayServer(single_channel.clone()))).unwrap().run().unwrap();
+    Http::new().bind(&addr, move || Ok(RelayServer(single_channel.clone())))?.run()?;
+    Ok(())
 }
