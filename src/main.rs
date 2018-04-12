@@ -6,7 +6,10 @@ extern crate webmetro;
 mod commands;
 
 use clap::{App, AppSettings};
-use commands::{relay};
+use commands::{
+    relay,
+    dump
+};
 
 fn options() -> App<'static, 'static> {
     App::new("webmetro")
@@ -14,6 +17,7 @@ fn options() -> App<'static, 'static> {
         .about("Utilities for broadcasting & relaying live WebM video/audio streams")
         .setting(AppSettings::VersionlessSubcommands)
         .subcommand(relay::options())
+        .subcommand(dump::options())
 }
 
 fn main() {
@@ -21,6 +25,7 @@ fn main() {
 
     match args.subcommand() {
         ("relay", Some(sub_args)) => relay::run(sub_args),
+        ("dump", Some(sub_args)) => dump::run(sub_args),
         _ => {
             options().print_help().unwrap();
             println!("");
