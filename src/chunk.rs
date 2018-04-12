@@ -1,7 +1,11 @@
 use futures::{Async, Stream};
-use std::io::Cursor;
-use std::mem;
-use std::sync::Arc;
+use std::{
+    error::Error,
+    fmt::{Display, Formatter, Result as FmtResult},
+    io::Cursor,
+    mem,
+    sync::Arc
+};
 use ebml::EbmlEventSource;
 use webm::*;
 
@@ -90,6 +94,20 @@ enum ChunkerState {
 pub enum ChunkingError<E> {
     IoError(::std::io::Error),
     OtherError(E)
+}
+
+impl<E: Display + Error> Display for ChunkingError<E> {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "Chunking error: {}", self.description())
+    }
+}
+impl<E: Error> Error for ChunkingError<E> {
+    fn description(&self) -> &str {
+        match self {
+            &ChunkingError::IoError(ref err) => err.description(),
+            &ChunkingError::OtherError(ref err) => err.description()
+        }
+    }
 }
 
 pub struct WebmChunker<S> {

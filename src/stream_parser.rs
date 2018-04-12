@@ -1,3 +1,8 @@
+use std::{
+    error::Error,
+    fmt::{Display, Formatter, Result as FmtResult}
+};
+
 use bytes::BytesMut;
 use bytes::BufMut;
 use futures::Async;
@@ -11,6 +16,19 @@ use ebml::FromEbml;
 pub enum ParsingError<E> {
     EbmlError(EbmlError),
     OtherError(E)
+}
+impl<E: Display + Error> Display for ParsingError<E> {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "Parsing error: {}", self.description())
+    }
+}
+impl<E: Error> Error for ParsingError<E> {
+    fn description(&self) -> &str {
+        match self {
+            &ParsingError::EbmlError(ref err) => err.description(),
+            &ParsingError::OtherError(ref err) => err.description()
+        }
+    }
 }
 
 pub struct EbmlStreamingParser<S> {

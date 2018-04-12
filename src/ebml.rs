@@ -15,6 +15,21 @@ pub enum EbmlError {
     UnknownElementLength,
     CorruptPayload,
 }
+impl Display for EbmlError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.description())
+    }
+}
+impl ErrorTrait for EbmlError {
+    fn description(&self) -> &str {
+        match self {
+            &EbmlError::CorruptVarint => "EBML Varint could not be parsed",
+            &EbmlError::UnknownElementId => "EBML element ID was \"unknown\"",
+            &EbmlError::UnknownElementLength => "EBML element length was \"unknown\" for an element not allowing that",
+            &EbmlError::CorruptPayload => "EBML element payload could not be parsed",
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum WriteError {
