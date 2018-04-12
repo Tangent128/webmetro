@@ -8,6 +8,7 @@ mod commands;
 use clap::{App, AppSettings};
 use commands::{
     relay,
+    filter,
     dump
 };
 
@@ -17,6 +18,7 @@ fn options() -> App<'static, 'static> {
         .about("Utilities for broadcasting & relaying live WebM video/audio streams")
         .setting(AppSettings::VersionlessSubcommands)
         .subcommand(relay::options())
+        .subcommand(filter::options())
         .subcommand(dump::options())
 }
 
@@ -24,6 +26,7 @@ fn main() {
     let args = options().get_matches();
 
     match args.subcommand() {
+        ("filter", Some(sub_args)) => filter::run(sub_args),
         ("relay", Some(sub_args)) => relay::run(sub_args),
         ("dump", Some(sub_args)) => dump::run(sub_args),
         _ => {

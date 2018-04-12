@@ -10,6 +10,7 @@ use futures::{
 };
 
 pub mod dump;
+pub mod filter;
 pub mod relay;
 
 /// A hackish adapter that makes chunks of bytes from stdin available as a Stream;
