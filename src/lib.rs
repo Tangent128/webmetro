@@ -4,6 +4,7 @@ extern crate futures;
 extern crate odds;
 
 pub mod ebml;
+pub mod error;
 pub mod iterator;
 pub mod slice;
 pub mod stream_parser;
