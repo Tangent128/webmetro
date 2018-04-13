@@ -14,7 +14,7 @@ use ebml::EbmlError;
 pub enum WebmetroError {
     EbmlError(EbmlError),
     IoError(IoError),
-    Unknown(Box<Error>)
+    Unknown(Box<Error + Send>)
 }
 
 impl Display for WebmetroError {
@@ -48,8 +48,8 @@ impl From<IoError> for WebmetroError {
     }
 }
 
-impl From<Box<Error>> for WebmetroError {
-    fn from(err: Box<Error>) -> WebmetroError {
+impl From<Box<Error + Send>> for WebmetroError {
+    fn from(err: Box<Error + Send>) -> WebmetroError {
         WebmetroError::Unknown(err)
     }
 }

@@ -58,9 +58,9 @@ impl RelayServer {
     }
 
     fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> BodyStream
-    where S::Error: Error {
+    where S::Error: Error + Send {
         let source = stream
-            .map_err(|err| WebmetroError::Unknown(err.into()))
+            .map_err(|err| WebmetroError::Unknown(Box::new(err)))
             .parse_ebml().chunk_webm();
         let sink = Transmitter::new(self.get_channel());
 
