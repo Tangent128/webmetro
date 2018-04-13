@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use futures::Async;
 use futures::stream::Stream;
 
@@ -82,6 +84,21 @@ impl<S: Stream<Item = Chunk>> Stream for StartingPointFinder<S>
     }
 }
 
+pub struct Throttle<S> {
+    stream: S,
+    start_time: Instant
+}
+
+impl<S: Stream<Item = Chunk>> Stream for Throttle<S>
+{
+    type Item = S::Item;
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        self.stream.poll()
+    }
+}
+
 pub trait ChunkStream where Self : Sized + Stream<Item = Chunk> {
     fn fix_timecodes(self) -> ChunkTimecodeFixer<Self> {
         ChunkTimecodeFixer {
@@ -97,6 +114,13 @@ pub trait ChunkStream where Self : Sized + Stream<Item = Chunk> {
             stream: self,
             seen_header: false,
             seen_keyframe: false
+        }
+    }
+
+    fn throttle(self) -> Throttle<Self> {
+        Throttle {
+            stream: self,
+            start_time: Instant::now()
         }
     }
 }
