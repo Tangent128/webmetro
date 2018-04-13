@@ -1,12 +1,11 @@
 use futures::{Async, Stream};
 use std::{
-    error::Error,
-    fmt::{Display, Formatter, Result as FmtResult},
     io::Cursor,
     mem,
     sync::Arc
 };
 use ebml::EbmlEventSource;
+use error::WebmetroError;
 use webm::*;
 
 #[derive(Clone, Debug)]
@@ -90,37 +89,18 @@ enum ChunkerState {
     End
 }
 
-#[derive(Debug)]
-pub enum ChunkingError<E> {
-    IoError(::std::io::Error),
-    OtherError(E)
-}
-
-impl<E: Display + Error> Display for ChunkingError<E> {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "Chunking error: {}", self.description())
-    }
-}
-impl<E: Error> Error for ChunkingError<E> {
-    fn description(&self) -> &str {
-        match self {
-            &ChunkingError::IoError(ref err) => err.description(),
-            &ChunkingError::OtherError(ref err) => err.description()
-        }
-    }
-}
-
 pub struct WebmChunker<S> {
     source: S,
     state: ChunkerState
 }
 
 impl<S: EbmlEventSource> Stream for WebmChunker<S>
+where S::Error: Into<WebmetroError>
 {
     type Item = Chunk;
-    type Error = ChunkingError<S::Error>;
+    type Error = WebmetroError;
 
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, WebmetroError> {
         loop {
             let mut return_value = None;
             let mut new_state = None;
@@ -128,7 +108,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
             match self.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
                     match self.source.poll_event() {
-                        Err(passthru) => return Err(ChunkingError::OtherError(passthru)),
+                        Err(passthru) => return Err(passthru.into()),
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
                         Ok(Async::Ready(Some(WebmElement::Cluster))) => {
@@ -148,7 +128,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
                             match encode_webm_element(element, buffer) {
                                 Ok(_) => {},
                                 Err(err) => {
-                                    return_value = Some(Err(ChunkingError::IoError(err)));
+                                    return_value = Some(Err(err.into()));
                                     new_state = Some(ChunkerState::End);
                                 }
                             }
@@ -157,7 +137,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
                 },
                 ChunkerState::BuildingCluster(ref mut cluster_head, ref mut buffer) => {
                     match self.source.poll_event() {
-                        Err(passthru) => return Err(ChunkingError::OtherError(passthru)),
+                        Err(passthru) => return Err(passthru.into()),
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Ok(Async::Ready(Some(element @ WebmElement::EbmlHead)))
                         | Ok(Async::Ready(Some(element @ WebmElement::Segment))) => {
@@ -174,7 +154,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
                                     });
                                 },
                                 Err(err) => {
-                                    return_value = Some(Err(ChunkingError::IoError(err)));
+                                    return_value = Some(Err(err.into()));
                                     new_state = Some(ChunkerState::End);
                                 }
                             }
@@ -198,7 +178,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
                             match encode_webm_element(WebmElement::SimpleBlock(*block), buffer) {
                                 Ok(_) => {},
                                 Err(err) => {
-                                    return_value = Some(Err(ChunkingError::IoError(err)));
+                                    return_value = Some(Err(err.into()));
                                     new_state = Some(ChunkerState::End);
                                 }
                             }
@@ -210,7 +190,7 @@ impl<S: EbmlEventSource> Stream for WebmChunker<S>
                             match encode_webm_element(element, buffer) {
                                 Ok(_) => {},
                                 Err(err) => {
-                                    return_value = Some(Err(ChunkingError::IoError(err)));
+                                    return_value = Some(Err(err.into()));
                                     new_state = Some(ChunkerState::End);
                                 }
                             }

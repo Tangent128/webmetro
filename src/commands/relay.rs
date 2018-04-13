@@ -33,7 +33,7 @@ use webmetro::{
         Listener,
         Transmitter
     },
-    chunk::{Chunk, WebmStream, ChunkingError},
+    chunk::{Chunk, WebmStream},
     error::WebmetroError,
     fixers::ChunkStream,
     stream_parser::StreamEbml
@@ -65,13 +65,13 @@ impl RelayServer {
         let sink = Transmitter::new(self.get_channel());
 
         Box::new(
-            source.forward(sink.sink_map_err(|err| match err {}))
+            source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
             .into_stream()
             .map(|_| empty())
             .map_err(|err| {
                 let io_err = match err {
-                    ChunkingError::IoError(io_err) => io_err,
-                    ChunkingError::OtherError(_) => ErrorKind::InvalidData.into()
+                    WebmetroError::IoError(io_err) => io_err,
+                    _ => ErrorKind::InvalidData.into()
                 };
                 println!("Post failed: {}", &io_err);
                 io_err
