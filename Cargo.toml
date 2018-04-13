@@ -7,5 +7,6 @@ authors = ["Tangent 128 <Tangent128@gmail.com>"]
 bytes = "0.4"
 clap = "2.31.2"
 futures = "0.1.20"
-hyper = "0.11.24"
+hyper = "0.11.25"
 odds = { version = "0.3.1", features = ["std-vec"] }
+tokio = "0.1.5"
