@@ -34,6 +34,7 @@ use webmetro::{
         Transmitter
     },
     chunk::{Chunk, WebmStream, ChunkingError},
+    error::WebmetroError,
     fixers::ChunkStream,
     stream_parser::StreamEbml
 };
@@ -56,8 +57,11 @@ impl RelayServer {
         )
     }
 
-    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> BodyStream {
-        let source = stream.parse_ebml().chunk_webm();
+    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> BodyStream
+    where S::Error: Error {
+        let source = stream
+            .map_err(|err| WebmetroError::Unknown(err.into()))
+            .parse_ebml().chunk_webm();
         let sink = Transmitter::new(self.get_channel());
 
         Box::new(

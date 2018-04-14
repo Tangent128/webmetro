@@ -1,5 +1,4 @@
 use std::io::{
-    Error as IoError,
     StdinLock,
     prelude::*
 };
@@ -8,6 +7,7 @@ use futures::{
     Async,
     stream::Stream
 };
+use webmetro::error::WebmetroError;
 
 pub mod dump;
 pub mod filter;
@@ -32,7 +32,7 @@ impl<'a> StdinStream<'a> {
 
 impl<'a> Stream for StdinStream<'a> {
     type Item = Vec<u8>;
-    type Error = IoError;
+    type Error = WebmetroError;
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
         self.buf_reader.consume(self.read_bytes);
@@ -44,6 +44,6 @@ impl<'a> Stream for StdinStream<'a> {
             } else {
                 Async::Ready(None)
             }
-        })
+        }).map_err(WebmetroError::IoError)
     }
 }
