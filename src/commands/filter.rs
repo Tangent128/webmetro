@@ -13,6 +13,7 @@ use webmetro::{
         Chunk,
         WebmStream
     },
+    error::WebmetroError,
     fixers::ChunkStream,
     stream_parser::StreamEbml
 };
@@ -28,11 +29,10 @@ pub fn options() -> App<'static, 'static> {
 pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
 
     let stdin = io::stdin();
-    let mut chunk_stream: Box<Stream<Item = Chunk, Error = Box<Error>>> = Box::new(
+    let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError>> = Box::new(
         StdinStream::new(stdin.lock())
         .parse_ebml()
         .chunk_webm()
-        .map_err(|err| Box::new(err) as Box<Error>)
         .fix_timecodes()
     );
 
@@ -40,8 +40,9 @@ pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    let result = chunk_stream.fold((), |_, chunk| {
+    chunk_stream.fold((), |_, chunk| {
         io::stdout().write_all(chunk.as_ref())
-    }).wait();
-    result
+    }).wait()?;
+
+    Ok(())
 }

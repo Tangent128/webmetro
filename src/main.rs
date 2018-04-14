@@ -1,6 +1,7 @@
 #[macro_use] extern crate clap;
 extern crate futures;
 extern crate hyper;
+extern crate tokio;
 extern crate webmetro;
 
 mod commands;
