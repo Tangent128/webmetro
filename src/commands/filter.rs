@@ -6,6 +6,7 @@ use std::{
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
+use tokio;
 
 use super::stdin_stream;
 use webmetro::{
@@ -28,7 +29,7 @@ pub fn options() -> App<'static, 'static> {
 
 pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
 
-    let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError>> = Box::new(
+    let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError> + Send> = Box::new(
         stdin_stream()
         .parse_ebml()
         .chunk_webm()
@@ -39,9 +40,12 @@ pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    chunk_stream.fold((), |_, chunk| {
-        io::stdout().write_all(chunk.as_ref())
-    }).wait()?;
+    tokio::run(chunk_stream.for_each(|chunk| {
+        io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::IoError)
+    }).map_err(|err| {
+        println!("Error: {}", err);
+        ::std::process::exit(1);
+    }));
 
     Ok(())
 }
