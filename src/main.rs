@@ -36,5 +36,8 @@ fn main() {
             println!("");
             Ok(())
         }
-    }.unwrap_or_else(|err| println!("Error: {}", err));
+    }.unwrap_or_else(|err| {
+        println!("Error: {}", err);
+        ::std::process::exit(1);
+    });
 }
