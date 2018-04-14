@@ -1,12 +1,9 @@
-use std::{
-    error::Error,
-    io
-};
+use std::error::Error;
 
 use clap::{App, AppSettings, ArgMatches, SubCommand};
 use futures::Async;
 
-use super::StdinStream;
+use super::stdin_stream;
 use webmetro::{
     stream_parser::StreamEbml,
     webm::{
@@ -23,8 +20,7 @@ pub fn options() -> App<'static, 'static> {
 
 pub fn run(_args: &ArgMatches) -> Result<(), Box<Error>> {
 
-    let stdin = io::stdin();
-    let mut events = StdinStream::new(stdin.lock()).parse_ebml();
+    let mut events = stdin_stream().parse_ebml();
 
     // stdin is sync so Async::NotReady will never happen
     while let Ok(Async::Ready(Some(element))) = events.poll_event() {

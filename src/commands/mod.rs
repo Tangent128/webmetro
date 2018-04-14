@@ -1,11 +1,19 @@
 use std::io::{
-    StdinLock,
-    prelude::*
+    Error as IoError,
+    stdin,
+    Stdin
 };
 
 use futures::{
-    Async,
-    stream::Stream
+    prelude::*,
+    stream::MapErr
+};
+use tokio_io::{
+    io::AllowStdIo,
+    codec::{
+        BytesCodec,
+        FramedRead
+    }
 };
 use webmetro::error::WebmetroError;
 
@@ -13,37 +21,10 @@ pub mod dump;
 pub mod filter;
 pub mod relay;
 
-/// A hackish adapter that makes chunks of bytes from stdin available as a Stream;
-/// is NOT actually async, and just uses blocking read. Buffers aren't optimized either
-/// and copy more than necessary.
-pub struct StdinStream<'a> {
-    buf_reader: StdinLock<'a>,
-    read_bytes: usize
-}
-
-impl<'a> StdinStream<'a> {
-    pub fn new(lock: StdinLock<'a>) -> Self {
-        StdinStream {
-            buf_reader: lock,
-            read_bytes: 0
-        }
-    }
-}
-
-impl<'a> Stream for StdinStream<'a> {
-    type Item = Vec<u8>;
-    type Error = WebmetroError;
-
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
-        self.buf_reader.consume(self.read_bytes);
-        let read_bytes = &mut self.read_bytes;
-        self.buf_reader.fill_buf().map(|slice| {
-            *read_bytes = slice.len();
-            if *read_bytes > 0 {
-                Async::Ready(Some(Into::<Vec<u8>>::into(slice)))
-            } else {
-                Async::Ready(None)
-            }
-        }).map_err(WebmetroError::IoError)
-    }
+/// An adapter that makes chunks of bytes from stdin available as a Stream;
+/// is NOT actually async, and just uses blocking read. Don't use more than
+/// one at once, who knows who gets which bytes.
+pub fn stdin_stream() -> MapErr<FramedRead<AllowStdIo<Stdin>, BytesCodec>, fn(IoError) -> WebmetroError> {
+    FramedRead::new(AllowStdIo::new(stdin()), BytesCodec::new())
+    .map_err(WebmetroError::IoError)
 }

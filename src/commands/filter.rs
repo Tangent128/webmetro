@@ -7,7 +7,7 @@ use std::{
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
 
-use super::StdinStream;
+use super::stdin_stream;
 use webmetro::{
     chunk::{
         Chunk,
@@ -28,9 +28,8 @@ pub fn options() -> App<'static, 'static> {
 
 pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
 
-    let stdin = io::stdin();
     let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError>> = Box::new(
-        StdinStream::new(stdin.lock())
+        stdin_stream()
         .parse_ebml()
         .chunk_webm()
         .fix_timecodes()
