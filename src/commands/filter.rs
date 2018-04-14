@@ -5,7 +5,7 @@ use std::{
 };
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use futures::Stream;
+use futures::prelude::*;
 
 use super::StdinStream;
 use webmetro::{
@@ -40,11 +40,8 @@ pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    let stdout = io::stdout();
-    let mut stdout_writer = stdout.lock();
-    for chunk in chunk_stream.wait() {
-        stdout_writer.write_all(chunk?.as_ref())?;
-    }
-
-    Ok(())
+    let result = chunk_stream.fold((), |_, chunk| {
+        io::stdout().write_all(chunk.as_ref())
+    }).wait();
+    result
 }
