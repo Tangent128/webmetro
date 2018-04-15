@@ -1,10 +1,9 @@
-use std::error::Error;
-
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use futures::Async;
+use futures::prelude::*;
 
 use super::stdin_stream;
 use webmetro::{
+    error::WebmetroError,
     stream_parser::StreamEbml,
     webm::{
         SimpleBlock,
@@ -18,7 +17,7 @@ pub fn options() -> App<'static, 'static> {
         .about("Dumps WebM parsing events from parsing stdin")
 }
 
-pub fn run(_args: &ArgMatches) -> Result<(), Box<Error>> {
+pub fn run(_args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let mut events = stdin_stream().parse_ebml();
 

@@ -8,6 +8,9 @@ extern crate webmetro;
 mod commands;
 
 use clap::{App, AppSettings};
+use futures::prelude::*;
+use webmetro::error::WebmetroError;
+
 use commands::{
     relay,
     filter,
@@ -27,17 +30,26 @@ fn options() -> App<'static, 'static> {
 fn main() {
     let args = options().get_matches();
 
-    match args.subcommand() {
-        ("filter", Some(sub_args)) => filter::run(sub_args),
-        ("relay", Some(sub_args)) => relay::run(sub_args),
-        ("dump", Some(sub_args)) => dump::run(sub_args),
-        _ => {
+    tokio_run(match args.subcommand() {
+        ("filter", Some(sub_args)) => box_up(filter::run(sub_args)),
+        ("relay", Some(sub_args)) => box_up(relay::run(sub_args)),
+        ("dump", Some(sub_args)) => box_up(dump::run(sub_args)),
+        _ => box_up(futures::lazy(|| {
             options().print_help().unwrap();
             println!("");
             Ok(())
-        }
-    }.unwrap_or_else(|err| {
-        println!("Error: {}", err);
-        ::std::process::exit(1);
+        }))
     });
+}
+
+fn tokio_run(task: Box<Future<Item=(), Error=WebmetroError> + Send + 'static>) {
+    tokio::run(task.into_future().map_err(|err| {
+        eprintln!("Error: {}", err);
+        ::std::process::exit(1);
+    }));
+}
+
+fn box_up<F: IntoFuture<Item=(), Error=WebmetroError>>(task: F) -> Box<Future<Item=(), Error=WebmetroError> + Send + 'static>
+where F::Future: Send + 'static {
+    Box::new(task.into_future())
 }

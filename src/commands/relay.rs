@@ -122,12 +122,19 @@ pub fn options() -> App<'static, 'static> {
             .required(true))
 }
 
-pub fn run(args: &ArgMatches) -> Result<(), Box<Error>> {
+pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let single_channel = Channel::new();
 
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
     let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    Http::new().bind(&addr, move || Ok(RelayServer(single_channel.clone())))?.run()?;
+    Http::new()
+        .bind(&addr, move || {
+            Ok(RelayServer(single_channel.clone()))
+        })
+        .map_err(|err| WebmetroError::Unknown(Box::new(err)))?
+        .run()
+        .map_err(|err| WebmetroError::Unknown(Box::new(err)))?;
+
     Ok(())
 }

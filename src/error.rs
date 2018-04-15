@@ -53,3 +53,10 @@ impl From<Box<Error + Send>> for WebmetroError {
         WebmetroError::Unknown(err)
     }
 }
+
+impl<'a> From<&'a str> for WebmetroError {
+    fn from(err: &'a str) -> WebmetroError {
+        let error: Box<Error + Send + Sync> = err.into();
+        WebmetroError::Unknown(error)
+    }
+}
