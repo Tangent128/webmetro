@@ -22,7 +22,7 @@ pub fn options() -> App<'static, 'static> {
         .about("Copies WebM from stdin to stdout, applying the same cleanup & stripping the relay server does.")
         .arg(Arg::with_name("throttle")
             .long("throttle")
-            .help("Slow down output to \"realtime\" speed as determined by the timestamps (useful for streaming)"))
+            .help("Slow down output to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
 pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send> {

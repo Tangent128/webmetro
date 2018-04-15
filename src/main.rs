@@ -16,6 +16,7 @@ use webmetro::error::WebmetroError;
 use commands::{
     relay,
     filter,
+    send,
     dump
 };
 
@@ -23,9 +24,11 @@ fn options() -> App<'static, 'static> {
     App::new("webmetro")
         .version(crate_version!())
         .about("Utilities for broadcasting & relaying live WebM video/audio streams")
+        .setting(AppSettings::DisableHelpSubcommand)
         .setting(AppSettings::VersionlessSubcommands)
         .subcommand(relay::options())
         .subcommand(filter::options())
+        .subcommand(send::options())
         .subcommand(dump::options())
 }
 
@@ -38,6 +41,7 @@ fn main() {
     tokio_run(core, match args.subcommand() {
         ("filter", Some(sub_args)) => box_up(filter::run(sub_args)),
         ("relay", Some(sub_args)) => box_up(relay::run(sub_args)),
+        ("send", Some(sub_args)) => box_up(send::run(handle, sub_args)),
         ("dump", Some(sub_args)) => box_up(dump::run(sub_args)),
         _ => box_up(futures::lazy(|| {
             options().print_help().unwrap();

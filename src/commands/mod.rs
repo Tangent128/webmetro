@@ -23,6 +23,7 @@ use webmetro::error::WebmetroError;
 pub mod dump;
 pub mod filter;
 pub mod relay;
+pub mod send;
 
 /// An adapter that makes chunks of bytes from stdin available as a Stream;
 /// is NOT actually async, and just uses blocking read. Don't use more than
