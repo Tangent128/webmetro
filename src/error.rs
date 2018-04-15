@@ -17,6 +17,16 @@ pub enum WebmetroError {
     Unknown(Box<Error + Send>)
 }
 
+impl WebmetroError {
+    pub fn from_str(string: &str) -> WebmetroError {
+        string.into()
+    }
+
+    pub fn from_err<E: Error + Send + 'static>(err: E) -> WebmetroError {
+        WebmetroError::Unknown(Box::new(err))
+    }
+}
+
 impl Display for WebmetroError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match self {

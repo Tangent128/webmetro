@@ -1,5 +1,7 @@
+use std::error::Error;
 use std::io::{
     Error as IoError,
+    ErrorKind,
     stdin,
     Stdin
 };
@@ -8,6 +10,7 @@ use futures::{
     prelude::*,
     stream::MapErr
 };
+use hyper::Error as HyperError;
 use tokio_io::{
     io::AllowStdIo,
     codec::{
@@ -27,4 +30,11 @@ pub mod relay;
 pub fn stdin_stream() -> MapErr<FramedRead<AllowStdIo<Stdin>, BytesCodec>, fn(IoError) -> WebmetroError> {
     FramedRead::new(AllowStdIo::new(stdin()), BytesCodec::new())
     .map_err(WebmetroError::IoError)
+}
+
+pub fn to_hyper_error(err: WebmetroError) -> HyperError {
+    match err {
+        WebmetroError::IoError(io_err) => io_err.into(),
+        err => IoError::new(ErrorKind::InvalidData, err.description()).into()
+    }
 }
