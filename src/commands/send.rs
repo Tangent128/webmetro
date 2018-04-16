@@ -76,7 +76,11 @@ pub fn run(handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=Webme
         request.set_body(request_body_stream);
 
         client.request(request)
-            .map(|_response| ())
+            .and_then(|response| {
+                response.body().for_each(|_chunk| {
+                    Ok(())
+                })
+            })
             .map_err(WebmetroError::from_err)
     }))
 }
