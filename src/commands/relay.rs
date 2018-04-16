@@ -70,7 +70,7 @@ impl RelayServer {
             .into_stream()
             .map(|_| empty())
             .map_err(|err| {
-                println!("{}", err);
+                //TODO: log something somewhere
                 to_hyper_error(err)
             })
             .flatten()
@@ -87,7 +87,7 @@ impl Service for RelayServer {
     fn call(&self, request: Request) -> Self::Future {
         let (method, uri, _http_version, _headers, request_body) = request.deconstruct();
 
-        eprintln!("New {} Request: {}", method, uri.path());
+        //TODO: log equiv to: eprintln!("New {} Request: {}", method, uri.path());
 
         ok(match (method, uri.path()) {
             (Head, "/live") => {
