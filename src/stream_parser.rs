@@ -10,7 +10,15 @@ use error::WebmetroError;
 pub struct EbmlStreamingParser<S> {
     stream: S,
     buffer: BytesMut,
+    buffer_size_limit: Option<usize>,
     last_read: usize
+}
+
+impl<S> EbmlStreamingParser<S> {
+    pub fn with_buffer_limit(mut self, limit: usize) -> Self {
+        self.buffer_size_limit = Some(limit);
+        self
+    }
 }
 
 pub trait StreamEbml where Self: Sized + Stream, Self::Item: AsRef<[u8]> {
@@ -18,6 +26,7 @@ pub trait StreamEbml where Self: Sized + Stream, Self::Item: AsRef<[u8]> {
         EbmlStreamingParser {
             stream: self,
             buffer: BytesMut::new(),
+            buffer_size_limit: None,
             last_read: 0
         }
     }
@@ -46,6 +55,12 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingPa
                         }
                     }
                 })
+            }
+
+            if let Some(limit) = self.buffer_size_limit {
+                if limit <= self.buffer.len() {
+                    return Err(WebmetroError::ResourcesExceeded);
+                }
             }
 
             match self.stream.poll() {

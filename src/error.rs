@@ -12,6 +12,7 @@ use ebml::EbmlError;
 
 #[derive(Debug)]
 pub enum WebmetroError {
+    ResourcesExceeded,
     EbmlError(EbmlError),
     IoError(IoError),
     Unknown(Box<Error + Send>)
@@ -30,6 +31,7 @@ impl WebmetroError {
 impl Display for WebmetroError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match self {
+            &WebmetroError::ResourcesExceeded => write!(f, "resources exceeded"),
             &WebmetroError::EbmlError(ref err) => err.fmt(f),
             &WebmetroError::IoError(ref err) => err.fmt(f),
             &WebmetroError::Unknown(ref err) => err.fmt(f),
@@ -39,6 +41,7 @@ impl Display for WebmetroError {
 impl Error for WebmetroError {
     fn description(&self) -> &str {
         match self {
+            &WebmetroError::ResourcesExceeded => "resources exceeded",
             &WebmetroError::EbmlError(ref err) => err.description(),
             &WebmetroError::IoError(ref err) => err.description(),
             &WebmetroError::Unknown(ref err) => err.description(),

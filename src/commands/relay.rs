@@ -40,6 +40,8 @@ use webmetro::{
 
 use super::to_hyper_error;
 
+const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
+
 type BodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
 
 struct RelayServer(Arc<Mutex<Channel>>);
@@ -62,7 +64,7 @@ impl RelayServer {
     where S::Error: Error + Send {
         let source = stream
             .map_err(WebmetroError::from_err)
-            .parse_ebml().chunk_webm();
+            .parse_ebml().with_buffer_limit(BUFFER_LIMIT).chunk_webm();
         let sink = Transmitter::new(self.get_channel());
 
         Box::new(
