@@ -91,7 +91,25 @@ enum ChunkerState {
 
 pub struct WebmChunker<S> {
     source: S,
+    buffer_size_limit: Option<usize>,
     state: ChunkerState
+}
+
+impl<S> WebmChunker<S> {
+    pub fn with_buffer_limit(mut self, limit: usize) -> Self {
+        self.buffer_size_limit = Some(limit);
+        self
+    }
+}
+
+fn encode(element: WebmElement, buffer: &mut Cursor<Vec<u8>>, limit: Option<usize>) -> Result<(), WebmetroError> {
+    if let Some(limit) = limit {
+        if limit <= buffer.get_ref().len() {
+            return Err(WebmetroError::ResourcesExceeded);
+        }
+    }
+
+    encode_webm_element(element, buffer).map_err(|err| err.into())
 }
 
 impl<S: EbmlEventSource> Stream for WebmChunker<S>
@@ -125,13 +143,10 @@ where S::Error: Into<WebmetroError>
                         Ok(Async::Ready(Some(WebmElement::Void))) => {},
                         Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
                         Ok(Async::Ready(Some(element))) => {
-                            match encode_webm_element(element, buffer) {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    return_value = Some(Err(err.into()));
-                                    new_state = Some(ChunkerState::End);
-                                }
-                            }
+                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                                return_value = Some(Err(err));
+                                new_state = Some(ChunkerState::End);
+                            });
                         }
                     }
                 },
@@ -145,7 +160,7 @@ where S::Error: Into<WebmetroError>
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
                             let mut new_header_cursor = Cursor::new(Vec::new());
-                            match encode_webm_element(element, &mut new_header_cursor) {
+                            match encode(element, &mut new_header_cursor, self.buffer_size_limit) {
                                 Ok(_) => {
                                     return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterHead(liberated_cluster_head)))));
                                     new_state = Some(ChunkerState::EmittingClusterBodyBeforeNewHeader{
@@ -154,7 +169,7 @@ where S::Error: Into<WebmetroError>
                                     });
                                 },
                                 Err(err) => {
-                                    return_value = Some(Err(err.into()));
+                                    return_value = Some(Err(err));
                                     new_state = Some(ChunkerState::End);
                                 }
                             }
@@ -175,25 +190,19 @@ where S::Error: Into<WebmetroError>
                                 cluster_head.keyframe = true;
                             }
                             cluster_head.observe_simpleblock_timecode(block.timecode);
-                            match encode_webm_element(WebmElement::SimpleBlock(*block), buffer) {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    return_value = Some(Err(err.into()));
-                                    new_state = Some(ChunkerState::End);
-                                }
-                            }
+                            encode(WebmElement::SimpleBlock(*block), buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                                return_value = Some(Err(err));
+                                new_state = Some(ChunkerState::End);
+                            });
                         },
                         Ok(Async::Ready(Some(WebmElement::Info))) => {},
                         Ok(Async::Ready(Some(WebmElement::Void))) => {},
                         Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
                         Ok(Async::Ready(Some(element))) => {
-                            match encode_webm_element(element, buffer) {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    return_value = Some(Err(err.into()));
-                                    new_state = Some(ChunkerState::End);
-                                }
-                            }
+                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                                return_value = Some(Err(err));
+                                new_state = Some(ChunkerState::End);
+                            });
                         },
                         Ok(Async::Ready(None)) => {
                             // flush final Cluster on end of stream
@@ -245,6 +254,7 @@ pub trait WebmStream where Self: Sized + EbmlEventSource {
     fn chunk_webm(self) -> WebmChunker<Self> {
         WebmChunker {
             source: self,
+            buffer_size_limit: None,
             state: ChunkerState::BuildingHeader(Cursor::new(Vec::new()))
         }
     }
