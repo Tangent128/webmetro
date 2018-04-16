@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::io::ErrorKind;
 use std::net::ToSocketAddrs;
 use std::sync::{
     Arc,
@@ -39,6 +38,8 @@ use webmetro::{
     stream_parser::StreamEbml
 };
 
+use super::to_hyper_error;
+
 type BodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
 
 struct RelayServer(Arc<Mutex<Channel>>);
@@ -60,7 +61,7 @@ impl RelayServer {
     fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> BodyStream
     where S::Error: Error + Send {
         let source = stream
-            .map_err(|err| WebmetroError::Unknown(Box::new(err)))
+            .map_err(WebmetroError::from_err)
             .parse_ebml().chunk_webm();
         let sink = Transmitter::new(self.get_channel());
 
@@ -69,12 +70,8 @@ impl RelayServer {
             .into_stream()
             .map(|_| empty())
             .map_err(|err| {
-                let io_err = match err {
-                    WebmetroError::IoError(io_err) => io_err,
-                    _ => ErrorKind::InvalidData.into()
-                };
-                println!("Post failed: {}", &io_err);
-                io_err
+                println!("{}", err);
+                to_hyper_error(err)
             })
             .flatten()
         )

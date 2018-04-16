@@ -60,7 +60,10 @@ pub fn run(handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=Webme
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    let request_body_stream = Box::new(chunk_stream.map_err(to_hyper_error)) as BoxedHyperStream;
+    let request_body_stream = Box::new(chunk_stream.map_err(|err| {
+        eprintln!("{}", &err);
+        to_hyper_error(err)
+    })) as BoxedHyperStream;
 
     Box::new(future::lazy(move || {
         url_str.parse().map_err(WebmetroError::from_err)
