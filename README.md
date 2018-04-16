@@ -6,6 +6,16 @@ The initialization segment is remembered, so that viewers can join mid-stream.
 
 Cluster timestamps are rewritten to be monotonic, so multiple (compatibly-encoded) webm files can be chained together without clients needing to reconnect.
 
+## Building
+
+Dependencies & building are handed by Cargo:
+
+`cargo build --release`
+
+If you're feeling bold, you can let Cargo install it for you:
+
+`cargo install`
+
 ## Usage
 
 Launch a relay server with the `relay` subcommand:
