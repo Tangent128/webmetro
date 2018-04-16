@@ -96,7 +96,10 @@ pub struct WebmChunker<S> {
 }
 
 impl<S> WebmChunker<S> {
-    pub fn with_buffer_limit(mut self, limit: usize) -> Self {
+    /// add a "soft" buffer size limit; if a chunk buffer exceeds this size,
+    /// error the stream instead of resuming. It's still possible for a buffer
+    /// to exceed this size *after* a write, so ensure input sizes are reasonable.
+    pub fn with_soft_limit(mut self, limit: usize) -> Self {
         self.buffer_size_limit = Some(limit);
         self
     }

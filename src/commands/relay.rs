@@ -64,8 +64,8 @@ impl RelayServer {
     where S::Error: Error + Send {
         let source = stream
             .map_err(WebmetroError::from_err)
-            .parse_ebml().with_buffer_limit(BUFFER_LIMIT)
-            .chunk_webm().with_buffer_limit(BUFFER_LIMIT);
+            .parse_ebml().with_soft_limit(BUFFER_LIMIT)
+            .chunk_webm().with_soft_limit(BUFFER_LIMIT);
         let sink = Transmitter::new(self.get_channel());
 
         Box::new(

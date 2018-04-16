@@ -15,7 +15,10 @@ pub struct EbmlStreamingParser<S> {
 }
 
 impl<S> EbmlStreamingParser<S> {
-    pub fn with_buffer_limit(mut self, limit: usize) -> Self {
+    /// add a "soft" buffer size limit; if the input buffer exceeds this size,
+    /// error the stream instead of resuming. It's still possible for the buffer
+    /// to exceed this size *after* a fill, so ensure input sizes are reasonable.
+    pub fn with_soft_limit(mut self, limit: usize) -> Self {
         self.buffer_size_limit = Some(limit);
         self
     }
