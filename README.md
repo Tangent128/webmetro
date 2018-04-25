@@ -40,12 +40,35 @@ You can use ffmpeg to transcode a non-WebM file or access a media device:
 
 ## Limitations
 
-* HTTPS is not supported yet. It really should be.
-* There aren't any access controls on either the source or viewer roles yet.
+* HTTPS is not supported yet. It really should be. (see "Nginx Proxying" below, though)
+* There aren't any access controls on either the source or viewer roles yet. (see "Nginx Proxying" below, though)
 * Currently the server only recognizes a single stream, at `/live`.
 * The server tries to start a viewer at a cluster containing a keyframe; it is not yet smart enough to ensure that the keyframe belongs to the *video* stream.
 * The server doesn't parse any metadata, such as tags; the Info segment is stripped out, everything else is blindly passed along.
 * The server drops any source that it feels uses too much buffer space. This is not yet configurable, though sane files probably won't hit the limit. (Essentially, clusters & the initialization segment can't individually be more than 2M)
+
+## Nginx Proxying
+
+To get around the current lack of native HTTPS support, you can have nginx terminate the SSL connection; likewise you can have nginx handle access control.
+
+The proxy block will need to include at least the following:
+
+```nginx
+location /webmetro/ {
+    # needed to stream PUT request bodies properly
+    proxy_http_version 1.1;
+    proxy_request_buffering off;
+    client_max_body_size 0;
+
+    # alternatively you may wish to bar PUT requests so only local clients can transmit
+    # proxy_method GET;
+
+    # proxy to a relay server that's only listening on localhost
+    proxy_pass http://localhost:8080/;
+}
+```
+
+This is also useful to simply have the same public port shared by webmetro and a nicely-formatted viewer page.
 
 ## See Also
 

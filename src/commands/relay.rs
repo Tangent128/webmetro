@@ -40,6 +40,8 @@ use webmetro::{
 
 use super::to_hyper_error;
 
+header! { (XAccelBuffering, "X-Accel-Buffering") => [String] }
+
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
 type BodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
@@ -96,10 +98,12 @@ impl Service for RelayServer {
             (Head, "/live") => {
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
+                    .with_header(XAccelBuffering("no".to_string()))
             },
             (Get, "/live") => {
                 Response::new()
                     .with_header(ContentType("video/webm".parse().unwrap()))
+                    .with_header(XAccelBuffering("no".to_string()))
                     .with_body(self.get_stream())
             },
             (Post, "/live") | (Put, "/live") => {
