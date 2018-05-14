@@ -25,7 +25,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down output to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send> {
+pub fn run(args: &ArgMatches) -> impl Future<Item=(), Error=WebmetroError> + Send {
     let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError> + Send> = Box::new(
         stdin_stream()
         .parse_ebml()
@@ -37,7 +37,7 @@ pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    Box::new(chunk_stream.for_each(|chunk| {
+    chunk_stream.for_each(|chunk| {
         io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::IoError)
-    }))
+    })
 }

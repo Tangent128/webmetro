@@ -48,8 +48,6 @@ header! { (XAccelBuffering, "X-Accel-Buffering") => [String] }
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
-type BodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
-
 struct RelayServer(Arc<Mutex<Channel>>);
 
 impl RelayServer {
@@ -57,16 +55,14 @@ impl RelayServer {
         self.0.clone()
     }
 
-    fn get_stream(&self) -> BodyStream {
-        Box::new(
-            Listener::new(self.get_channel())
-            .fix_timecodes()
-            .find_starting_point()
-            .map_err(|err| match err {})
-        )
+    fn get_stream(&self) -> impl Stream<Item = Chunk, Error = HyperError> {
+        Listener::new(self.get_channel())
+        .fix_timecodes()
+        .find_starting_point()
+        .map_err(|err| match err {})
     }
 
-    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> BodyStream
+    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> impl Stream<Item = Chunk, Error = HyperError>
     where S::Error: Error + Send {
         let source = stream
             .map_err(WebmetroError::from_err)
@@ -74,22 +70,22 @@ impl RelayServer {
             .chunk_webm().with_soft_limit(BUFFER_LIMIT);
         let sink = Transmitter::new(self.get_channel());
 
-        Box::new(
-            source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
-            .into_stream()
-            .map(|_| empty())
-            .map_err(|err| {
-                //TODO: log something somewhere
-                to_hyper_error(err)
-            })
-            .flatten()
-        )
+        source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
+        .into_stream()
+        .map(|_| empty())
+        .map_err(|err| {
+            println!("[Warning] {}", err);
+            to_hyper_error(err)
+        })
+        .flatten()
     }
 }
 
+type BoxedBodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
+
 impl Service for RelayServer {
     type Request = Request;
-    type Response = Response<BodyStream>;
+    type Response = Response<BoxedBodyStream>;
     type Error = HyperError;
     type Future = FutureResult<Self::Response, HyperError>;
 
@@ -110,11 +106,11 @@ impl Service for RelayServer {
                     .with_header(ContentType("video/webm".parse().unwrap()))
                     .with_header(XAccelBuffering("no".to_string()))
                     .with_header(CacheControl(vec![CacheDirective::NoCache, CacheDirective::NoStore]))
-                    .with_body(self.get_stream())
+                    .with_body(Box::new(self.get_stream()) as BoxedBodyStream)
             },
             (Post, "/live") | (Put, "/live") => {
                 Response::new()
-                    .with_body(self.post_stream(request_body))
+                    .with_body(Box::new(self.post_stream(request_body)) as BoxedBodyStream)
             },
             _ => {
                 Response::new()
