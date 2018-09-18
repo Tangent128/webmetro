@@ -8,9 +8,6 @@ use hyper::{
     client::HttpConnector,
     Request
 };
-use tokio_core::reactor::{
-    Handle
-};
 
 use super::{
     stdin_stream,
@@ -39,7 +36,7 @@ pub fn options() -> App<'static, 'static> {
 
 type BoxedChunkStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send>;
 
-pub fn run(_handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError>> {
+pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send> {
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
         .parse_ebml()
