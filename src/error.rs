@@ -15,7 +15,7 @@ pub enum WebmetroError {
     ResourcesExceeded,
     EbmlError(EbmlError),
     IoError(IoError),
-    Unknown(Box<Error + Send>)
+    Unknown(Box<Error + Send + Sync>)
 }
 
 impl WebmetroError {
@@ -23,7 +23,7 @@ impl WebmetroError {
         string.into()
     }
 
-    pub fn from_err<E: Error + Send + 'static>(err: E) -> WebmetroError {
+    pub fn from_err<E: Error + Send + Sync + 'static>(err: E) -> WebmetroError {
         WebmetroError::Unknown(Box::new(err))
     }
 }
@@ -61,8 +61,8 @@ impl From<IoError> for WebmetroError {
     }
 }
 
-impl From<Box<Error + Send>> for WebmetroError {
-    fn from(err: Box<Error + Send>) -> WebmetroError {
+impl From<Box<Error + Send + Sync>> for WebmetroError {
+    fn from(err: Box<Error + Send + Sync>) -> WebmetroError {
         WebmetroError::Unknown(err)
     }
 }

@@ -1,7 +1,6 @@
-use std::error::Error;
 use std::io::{
+    Cursor,
     Error as IoError,
-    ErrorKind,
     stdin,
     Stdin
 };
@@ -10,7 +9,7 @@ use futures::{
     prelude::*,
     stream::MapErr
 };
-use hyper::Error as HyperError;
+use hyper::body::Payload;
 use tokio_io::{
     io::AllowStdIo,
     codec::{
@@ -18,7 +17,10 @@ use tokio_io::{
         FramedRead
     }
 };
-use webmetro::error::WebmetroError;
+use webmetro::{
+    chunk::Chunk,
+    error::WebmetroError,
+};
 
 pub mod dump;
 pub mod filter;
@@ -33,9 +35,14 @@ pub fn stdin_stream() -> MapErr<FramedRead<AllowStdIo<Stdin>, BytesCodec>, fn(Io
     .map_err(WebmetroError::IoError)
 }
 
-pub fn to_hyper_error(err: WebmetroError) -> HyperError {
-    match err {
-        WebmetroError::IoError(io_err) => io_err.into(),
-        err => IoError::new(ErrorKind::InvalidData, err.description()).into()
+/// A wrapper to make a Stream of Webm chunks work as a payload for Hyper
+pub struct WebmPayload<S: Send + 'static>(pub S);
+
+impl<S: Stream<Item = Chunk, Error = WebmetroError> + Send + 'static> Payload for WebmPayload<S> {
+    type Data = Cursor<Chunk>;
+    type Error = S::Error;
+
+    fn poll_data(&mut self) -> Poll<Option<Cursor<Chunk>>, WebmetroError> {
+        self.0.poll().map(|async| async.map(|option| option.map(Cursor::new)))
     }
 }

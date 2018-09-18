@@ -16,19 +16,22 @@ use futures::{
     },
     stream::empty
 };
-use hyper::{
-    Error as HyperError,
-    Get,
-    Head,
-    Post,
-    Put,
+use http::{
+    request::Parts,
     StatusCode,
+};
+use hyper::{
+    Body,
+    Method,
+    Request,
+    Response,
+    rt,
+    Server,
+    service::Service,
     header::{
-        CacheControl,
-        CacheDirective,
-        ContentType
-    },
-    server::{Http, Request, Response, Service}
+        CACHE_CONTROL,
+        CONTENT_TYPE
+    }
 };
 use webmetro::{
     channel::{
@@ -42,9 +45,7 @@ use webmetro::{
     stream_parser::StreamEbml
 };
 
-use super::to_hyper_error;
-
-header! { (XAccelBuffering, "X-Accel-Buffering") => [String] }
+use super::WebmPayload;
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
@@ -55,15 +56,15 @@ impl RelayServer {
         self.0.clone()
     }
 
-    fn get_stream(&self) -> impl Stream<Item = Chunk, Error = HyperError> {
+    fn get_stream(&self) -> impl Stream<Item = Chunk, Error = WebmetroError> {
         Listener::new(self.get_channel())
         .fix_timecodes()
         .find_starting_point()
         .map_err(|err| match err {})
     }
 
-    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + 'static>(&self, stream: S) -> impl Stream<Item = Chunk, Error = HyperError>
-    where S::Error: Error + Send {
+    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + Send + 'static>(&self, stream: S) -> impl Stream<Item = Chunk, Error = WebmetroError>
+    where S::Error: Error + Send + Sync {
         let source = stream
             .map_err(WebmetroError::from_err)
             .parse_ebml().with_soft_limit(BUFFER_LIMIT)
@@ -75,46 +76,49 @@ impl RelayServer {
         .map(|_| empty())
         .map_err(|err| {
             println!("[Warning] {}", err);
-            to_hyper_error(err)
+            err
         })
         .flatten()
     }
 }
 
-type BoxedBodyStream = Box<Stream<Item = Chunk, Error = HyperError>>;
+type BoxedBodyStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send + 'static>;
 
 impl Service for RelayServer {
-    type Request = Request;
-    type Response = Response<BoxedBodyStream>;
-    type Error = HyperError;
-    type Future = FutureResult<Self::Response, HyperError>;
+    type ReqBody = Body;
+    type ResBody = WebmPayload<BoxedBodyStream>;
+    type Error = WebmetroError;
+    type Future = FutureResult<Response<WebmPayload<BoxedBodyStream>>, WebmetroError>;
 
-    fn call(&self, request: Request) -> Self::Future {
-        let (method, uri, _http_version, _headers, request_body) = request.deconstruct();
-
-        //TODO: log equiv to: eprintln!("New {} Request: {}", method, uri.path());
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let (Parts {method, uri, ..}, request_body) = request.into_parts();
 
         ok(match (method, uri.path()) {
-            (Head, "/live") => {
-                Response::new()
-                    .with_header(ContentType("video/webm".parse().unwrap()))
-                    .with_header(XAccelBuffering("no".to_string()))
-                    .with_header(CacheControl(vec![CacheDirective::NoCache, CacheDirective::NoStore]))
+            (Method::HEAD, "/live") => {
+                Response::builder()
+                    .header(CONTENT_TYPE, "video/webm")
+                    .header("X-Accel-Buffering", "no")
+                    .header(CACHE_CONTROL, "no-cache, no-store")
+                    .body(WebmPayload(Box::new(empty()) as BoxedBodyStream))
+                    .unwrap()
             },
-            (Get, "/live") => {
-                Response::new()
-                    .with_header(ContentType("video/webm".parse().unwrap()))
-                    .with_header(XAccelBuffering("no".to_string()))
-                    .with_header(CacheControl(vec![CacheDirective::NoCache, CacheDirective::NoStore]))
-                    .with_body(Box::new(self.get_stream()) as BoxedBodyStream)
+            (Method::GET, "/live") => {
+                Response::builder()
+                    .header(CONTENT_TYPE, "video/webm")
+                    .header("X-Accel-Buffering", "no")
+                    .header(CACHE_CONTROL, "no-cache, no-store")
+                    .body(WebmPayload(Box::new(self.get_stream()) as BoxedBodyStream))
+                    .unwrap()
             },
-            (Post, "/live") | (Put, "/live") => {
-                Response::new()
-                    .with_body(Box::new(self.post_stream(request_body)) as BoxedBodyStream)
+            (Method::POST, "/live") | (Method::PUT, "/live") => {
+                println!("[Info] New source on {}", uri.path());
+                Response::new(WebmPayload(Box::new(self.post_stream(request_body)) as BoxedBodyStream))
             },
             _ => {
-                Response::new()
-                    .with_status(StatusCode::NotFound)
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(WebmPayload(Box::new(empty()) as BoxedBodyStream))
+                    .unwrap()
             }
         })
     }
@@ -134,13 +138,14 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
     let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    Http::new()
-        .bind(&addr, move || {
-            Ok(RelayServer(single_channel.clone()))
+    rt::run(Server::bind(&addr)
+        .serve(move || {
+            ok::<_, WebmetroError>(RelayServer(single_channel.clone()))
         })
-        .map_err(|err| WebmetroError::Unknown(Box::new(err)))?
-        .run()
-        .map_err(|err| WebmetroError::Unknown(Box::new(err)))?;
+        .map_err(|err| {
+            println!("[Error] {}", err);
+        })
+    );
 
     Ok(())
 }

@@ -4,12 +4,9 @@ use futures::{
     prelude::*
 };
 use hyper::{
-    Error as HyperError,
-    Method,
-    client::{
-        Config,
-        Request
-    }
+    Client,
+    client::HttpConnector,
+    Request
 };
 use tokio_core::reactor::{
     Handle
@@ -17,7 +14,7 @@ use tokio_core::reactor::{
 
 use super::{
     stdin_stream,
-    to_hyper_error
+    WebmPayload
 };
 use webmetro::{
     chunk::{
@@ -40,10 +37,9 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down upload to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-type BoxedChunkStream = Box<Stream<Item = Chunk, Error = WebmetroError>>;
-type BoxedHyperStream = Box<Stream<Item = Chunk, Error = HyperError>>;
+type BoxedChunkStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send>;
 
-pub fn run(handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError>> {
+pub fn run(_handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError>> {
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
         .parse_ebml()
@@ -60,24 +56,20 @@ pub fn run(handle: Handle, args: &ArgMatches) -> Box<Future<Item=(), Error=Webme
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    let request_body_stream = Box::new(chunk_stream.map_err(|err| {
+    let request_payload = WebmPayload(chunk_stream.map_err(|err| {
         eprintln!("{}", &err);
-        to_hyper_error(err)
-    })) as BoxedHyperStream;
+        err
+    }));
 
     Box::new(future::lazy(move || {
-        url_str.parse().map_err(WebmetroError::from_err)
-    }).and_then(move |uri| {
-        let client = Config::default()
-            .body::<BoxedHyperStream>()
-            .build(&handle);
-
-        let mut request: Request<BoxedHyperStream> = Request::new(Method::Put, uri);
-        request.set_body(request_body_stream);
-
+        Request::put(url_str)
+        .body(request_payload)
+        .map_err(WebmetroError::from_err)
+    }).and_then(|request| {
+        let client = Client::builder().build(HttpConnector::new(1));
         client.request(request)
             .and_then(|response| {
-                response.body().for_each(|_chunk| {
+                response.into_body().for_each(|_chunk| {
                     Ok(())
                 })
             })

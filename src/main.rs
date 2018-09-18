@@ -1,6 +1,7 @@
 #[macro_use] extern crate clap;
 extern crate futures;
-#[macro_use] extern crate hyper;
+extern crate http;
+extern crate hyper;
 extern crate tokio;
 extern crate tokio_core;
 extern crate tokio_io;
