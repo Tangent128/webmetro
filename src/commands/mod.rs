@@ -10,12 +10,10 @@ use futures::{
     stream::MapErr
 };
 use hyper::body::Payload;
-use tokio_io::{
-    io::AllowStdIo,
-    codec::{
-        BytesCodec,
-        FramedRead
-    }
+use tokio_io::io::AllowStdIo;
+use tokio_codec::{
+    BytesCodec,
+    FramedRead
 };
 use webmetro::{
     chunk::Chunk,

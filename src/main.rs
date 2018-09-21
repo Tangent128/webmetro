@@ -2,7 +2,7 @@
 extern crate futures;
 extern crate http;
 extern crate hyper;
-extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate webmetro;
 
