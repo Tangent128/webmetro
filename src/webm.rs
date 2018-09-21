@@ -104,7 +104,7 @@ pub fn encode_simple_block<T: Write>(block: SimpleBlock, output: &mut T) -> IoRe
     encode_varint(Varint::Value(track), output)?;
 
     let mut buffer = Cursor::new([0; 3]);
-    buffer.put_i16::<BigEndian>(timecode);
+    buffer.put_i16_be(timecode);
     buffer.put_u8(flags);
 
     output.write_all(&buffer.get_ref()[..])?;
