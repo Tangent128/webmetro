@@ -11,29 +11,20 @@ use futures::{
     Future,
     Stream,
     Sink,
-    future::{
-        FutureResult,
-        ok
-    },
     stream::empty
-};
-use http::{
-    request::Parts,
-    StatusCode,
 };
 use hyper::{
     Body,
-    Method,
-    Request,
     Response,
-    Server,
-    service::Service,
     header::{
         CACHE_CONTROL,
         CONTENT_TYPE
     }
 };
-use tokio::runtime::Runtime;
+use warp::{
+    self,
+    Filter
+};
 use webmetro::{
     channel::{
         Channel,
@@ -90,32 +81,6 @@ fn media_response(body: Body) -> Response<Body> {
         .unwrap()
 }
 
-impl Service for RelayServer {
-    type ReqBody = Body;
-    type ResBody = Body;
-    type Error = WebmetroError;
-    type Future = FutureResult<Response<Body>, WebmetroError>;
-
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let (Parts {method, uri, ..}, request_body) = request.into_parts();
-
-        ok(match (method, uri.path()) {
-            (Method::HEAD, "/live") => media_response(Body::empty()),
-            (Method::GET, "/live") => media_response(Body::wrap_stream(self.get_stream())),
-            (Method::POST, "/live") | (Method::PUT, "/live") => {
-                println!("[Info] New source on {}", uri.path());
-                Response::new(Body::wrap_stream(self.post_stream(request_body)))
-            },
-            _ => {
-                Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::empty())
-                    .unwrap()
-            }
-        })
-    }
-}
-
 pub fn options() -> App<'static, 'static> {
     SubCommand::with_name("relay")
         .about("Hosts an HTTP-based relay server")
@@ -130,9 +95,23 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
     let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    Runtime::new().unwrap().block_on_all(Server::bind(&addr)
-        .serve(move || {
-            ok::<_, WebmetroError>(RelayServer(single_channel.clone()))
-        }).map_err(|err| WebmetroError::Unknown(Box::new(err)))
-    )
+    let relay_server = path!("live").map(move || RelayServer(single_channel.clone()));
+
+    let head = relay_server.clone().and(warp::head())
+        .map(|_| media_response(Body::empty()));
+
+    let get = relay_server.clone().and(warp::get2())
+        .map(|server: RelayServer| media_response(Body::wrap_stream(server.get_stream())));
+
+    let post_put = relay_server.clone().and(warp::post2().or(warp::put2()).unify())
+    .and(warp::body::stream()).map(|server: RelayServer, stream| {
+        println!("[Info] Source Connected");
+        Response::new(Body::wrap_stream(server.post_stream(stream)))
+    });
+
+    let routes = head
+        .or(get)
+        .or(post_put);
+
+    Ok(warp::serve(routes).run(addr))
 }
