@@ -3,6 +3,7 @@ use futures::{
     prelude::*
 };
 use hyper::{
+    Body,
     Client,
     client::HttpConnector,
     Request
@@ -10,8 +11,7 @@ use hyper::{
 use tokio::runtime::Runtime;
 
 use super::{
-    stdin_stream,
-    WebmPayload
+    stdin_stream
 };
 use webmetro::{
     chunk::{
@@ -53,7 +53,9 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    let request_payload = WebmPayload(chunk_stream.map_err(|err| {
+    let request_payload = Body::wrap_stream(chunk_stream.map(
+        |webm_chunk| webm_chunk.into_bytes()
+    ).map_err(|err| {
         eprintln!("{}", &err);
         err
     }));

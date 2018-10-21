@@ -1,10 +1,10 @@
-use std::error::Error;
 use std::net::ToSocketAddrs;
 use std::sync::{
     Arc,
     Mutex
 };
 
+use bytes::Bytes;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
     Future,
@@ -39,13 +39,11 @@ use webmetro::{
         Listener,
         Transmitter
     },
-    chunk::{Chunk, WebmStream},
+    chunk::WebmStream,
     error::WebmetroError,
     fixers::ChunkStream,
     stream_parser::StreamEbml
 };
-
-use super::WebmPayload;
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
@@ -56,15 +54,15 @@ impl RelayServer {
         self.0.clone()
     }
 
-    fn get_stream(&self) -> impl Stream<Item = Chunk, Error = WebmetroError> {
+    fn get_stream(&self) -> impl Stream<Item = Bytes, Error = WebmetroError> {
         Listener::new(self.get_channel())
         .fix_timecodes()
         .find_starting_point()
+        .map(|webm_chunk| webm_chunk.into_bytes())
         .map_err(|err| match err {})
     }
 
-    fn post_stream<I: AsRef<[u8]>, S: Stream<Item = I> + Send + 'static>(&self, stream: S) -> impl Stream<Item = Chunk, Error = WebmetroError>
-    where S::Error: Error + Send + Sync {
+    fn post_stream(&self, stream: Body) -> impl Stream<Item = Bytes, Error = WebmetroError> {
         let source = stream
             .map_err(WebmetroError::from_err)
             .parse_ebml().with_soft_limit(BUFFER_LIMIT)
@@ -82,13 +80,11 @@ impl RelayServer {
     }
 }
 
-type BoxedBodyStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send + 'static>;
-
 impl Service for RelayServer {
     type ReqBody = Body;
-    type ResBody = WebmPayload<BoxedBodyStream>;
+    type ResBody = Body;
     type Error = WebmetroError;
-    type Future = FutureResult<Response<WebmPayload<BoxedBodyStream>>, WebmetroError>;
+    type Future = FutureResult<Response<Body>, WebmetroError>;
 
     fn call(&mut self, request: Request<Body>) -> Self::Future {
         let (Parts {method, uri, ..}, request_body) = request.into_parts();
@@ -99,7 +95,7 @@ impl Service for RelayServer {
                     .header(CONTENT_TYPE, "video/webm")
                     .header("X-Accel-Buffering", "no")
                     .header(CACHE_CONTROL, "no-cache, no-store")
-                    .body(WebmPayload(Box::new(empty()) as BoxedBodyStream))
+                    .body(Body::empty())
                     .unwrap()
             },
             (Method::GET, "/live") => {
@@ -107,17 +103,17 @@ impl Service for RelayServer {
                     .header(CONTENT_TYPE, "video/webm")
                     .header("X-Accel-Buffering", "no")
                     .header(CACHE_CONTROL, "no-cache, no-store")
-                    .body(WebmPayload(Box::new(self.get_stream()) as BoxedBodyStream))
+                    .body(Body::wrap_stream(self.get_stream()))
                     .unwrap()
             },
             (Method::POST, "/live") | (Method::PUT, "/live") => {
                 println!("[Info] New source on {}", uri.path());
-                Response::new(WebmPayload(Box::new(self.post_stream(request_body)) as BoxedBodyStream))
+                Response::new(Body::wrap_stream(self.post_stream(request_body)))
             },
             _ => {
                 Response::builder()
                     .status(StatusCode::NOT_FOUND)
-                    .body(WebmPayload(Box::new(empty()) as BoxedBodyStream))
+                    .body(Body::empty())
                     .unwrap()
             }
         })
