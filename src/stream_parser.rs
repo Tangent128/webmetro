@@ -1,10 +1,17 @@
-use bytes::BytesMut;
-use bytes::BufMut;
-use futures::Async;
-use futures::stream::Stream;
+use bytes::{
+    Buf,
+    BufMut,
+    BytesMut
+};
+use futures::{
+    Async,
+    stream::Stream
+};
 
-use ebml::EbmlEventSource;
-use ebml::FromEbml;
+use ebml::{
+    EbmlEventSource,
+    FromEbml
+};
 use error::WebmetroError;
 
 pub struct EbmlStreamingParser<S> {
@@ -24,7 +31,7 @@ impl<S> EbmlStreamingParser<S> {
     }
 }
 
-pub trait StreamEbml where Self: Sized + Stream, Self::Item: AsRef<[u8]> {
+pub trait StreamEbml where Self: Sized + Stream, Self::Item: Buf {
     fn parse_ebml(self) -> EbmlStreamingParser<Self> {
         EbmlStreamingParser {
             stream: self,
@@ -35,9 +42,9 @@ pub trait StreamEbml where Self: Sized + Stream, Self::Item: AsRef<[u8]> {
     }
 }
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> StreamEbml for S {}
+impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> StreamEbml for S {}
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> {
+impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> {
     pub fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, WebmetroError> {
         // release buffer from previous event
         self.buffer.advance(self.last_read);
@@ -67,9 +74,9 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingPa
             }
 
             match self.stream.poll() {
-                Ok(Async::Ready(Some(chunk))) => {
-                    self.buffer.reserve(chunk.as_ref().len());
-                    self.buffer.put_slice(chunk.as_ref());
+                Ok(Async::Ready(Some(buf))) => {
+                    self.buffer.reserve(buf.remaining());
+                    self.buffer.put(buf);
                     // ok can retry decoding now
                 },
                 other => return other.map(|async| async.map(|_| None))
@@ -78,7 +85,7 @@ impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingPa
     }
 }
 
-impl<I: AsRef<[u8]>, S: Stream<Item = I, Error = WebmetroError>> EbmlEventSource for EbmlStreamingParser<S> {
+impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlEventSource for EbmlStreamingParser<S> {
     type Error = WebmetroError;
 
     fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, WebmetroError> {

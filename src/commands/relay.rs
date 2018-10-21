@@ -1,10 +1,11 @@
+use std::error::Error;
 use std::net::ToSocketAddrs;
 use std::sync::{
     Arc,
     Mutex
 };
 
-use bytes::Bytes;
+use bytes::{Bytes, Buf};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
     Future,
@@ -62,7 +63,7 @@ impl RelayServer {
         .map_err(|err| match err {})
     }
 
-    fn post_stream(&self, stream: Body) -> impl Stream<Item = Bytes, Error = WebmetroError> {
+    fn post_stream(&self, stream: impl Stream<Item = impl Buf, Error = impl Error + Send + Sync + 'static>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
         let source = stream
             .map_err(WebmetroError::from_err)
             .parse_ebml().with_soft_limit(BUFFER_LIMIT)
