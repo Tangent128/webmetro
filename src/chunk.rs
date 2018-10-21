@@ -54,6 +54,7 @@ impl AsRef<[u8]> for ClusterHead {
     }
 }
 
+/// A chunk of WebM data
 #[derive(Clone, Debug)]
 pub enum Chunk {
     Headers {

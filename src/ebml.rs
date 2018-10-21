@@ -169,7 +169,7 @@ pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<()> {
     };
 
     let mut buffer = Cursor::new([0; 8]);
-    buffer.put_uint::<BigEndian>(number, size);
+    buffer.put_uint_be(number, size);
 
     return output.write_all(&buffer.get_ref()[..size]);
 }
@@ -188,7 +188,7 @@ pub fn encode_varint_4<T: Write>(varint: Varint, output: &mut T) -> IoResult<()>
     };
 
     let mut buffer = Cursor::new([0; 4]);
-    buffer.put_u32::<BigEndian>(number as u32);
+    buffer.put_u32_be(number as u32);
 
     output.write_all(&buffer.get_ref()[..])
 }
@@ -224,7 +224,7 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
     encode_tag_header(tag, Varint::Value(8), output)?;
 
     let mut buffer = Cursor::new([0; 8]);
-    buffer.put_u64::<BigEndian>(value);
+    buffer.put_u64_be(value);
 
     output.write_all(&buffer.get_ref()[..])
 }

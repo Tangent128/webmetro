@@ -1,8 +1,8 @@
 #[macro_use] extern crate clap;
 extern crate futures;
-#[macro_use] extern crate hyper;
-extern crate tokio;
-extern crate tokio_core;
+extern crate http;
+extern crate hyper;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate webmetro;
 
@@ -10,7 +10,7 @@ mod commands;
 
 use clap::{App, AppSettings};
 use futures::prelude::*;
-use tokio_core::reactor::Core;
+use hyper::rt;
 use webmetro::error::WebmetroError;
 
 use commands::{
@@ -35,13 +35,10 @@ fn options() -> App<'static, 'static> {
 fn main() {
     let args = options().get_matches();
 
-    let core = Core::new().unwrap();
-    let handle = core.handle();
-
-    tokio_run(core, match args.subcommand() {
+    tokio_run(match args.subcommand() {
         ("filter", Some(sub_args)) => box_up(filter::run(sub_args)),
         ("relay", Some(sub_args)) => box_up(relay::run(sub_args)),
-        ("send", Some(sub_args)) => box_up(send::run(handle, sub_args)),
+        ("send", Some(sub_args)) => box_up(send::run(sub_args)),
         ("dump", Some(sub_args)) => box_up(dump::run(sub_args)),
         _ => box_up(futures::lazy(|| {
             options().print_help().unwrap();
@@ -51,15 +48,15 @@ fn main() {
     });
 }
 
-fn tokio_run(mut core: Core, task: Box<Future<Item=(), Error=WebmetroError>>) {
-    core.run(task.into_future()).unwrap_or_else(|err| {
+fn tokio_run(task: Box<Future<Item=(), Error=WebmetroError> + Send>) {
+    rt::run(task.into_future().map_err(|err| {
         eprintln!("Error: {}", err);
         ::std::process::exit(1);
-    });
+    }));
 }
 
-fn box_up<F: IntoFuture<Item=(), Error=WebmetroError>>(task: F) -> Box<Future<Item=(), Error=WebmetroError>>
-where F::Future: 'static
+fn box_up<F: IntoFuture<Item=(), Error=WebmetroError>>(task: F) -> Box<Future<Item=(), Error=WebmetroError> + Send>
+where F::Future: Send + 'static
 {
     Box::new(task.into_future())
 }
