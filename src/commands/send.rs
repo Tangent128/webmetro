@@ -72,5 +72,5 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     })
     .map_err(WebmetroError::from_err);
 
-    Runtime::new().unwrap().block_on_all(future)
+    Runtime::new().unwrap().block_on(future)
 }
