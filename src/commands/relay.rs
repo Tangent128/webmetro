@@ -80,6 +80,15 @@ impl RelayServer {
     }
 }
 
+fn media_response(body: Body) -> Response<Body> {
+    Response::builder()
+        .header(CONTENT_TYPE, "video/webm")
+        .header("X-Accel-Buffering", "no")
+        .header(CACHE_CONTROL, "no-cache, no-store")
+        .body(body)
+        .unwrap()
+}
+
 impl Service for RelayServer {
     type ReqBody = Body;
     type ResBody = Body;
@@ -90,22 +99,8 @@ impl Service for RelayServer {
         let (Parts {method, uri, ..}, request_body) = request.into_parts();
 
         ok(match (method, uri.path()) {
-            (Method::HEAD, "/live") => {
-                Response::builder()
-                    .header(CONTENT_TYPE, "video/webm")
-                    .header("X-Accel-Buffering", "no")
-                    .header(CACHE_CONTROL, "no-cache, no-store")
-                    .body(Body::empty())
-                    .unwrap()
-            },
-            (Method::GET, "/live") => {
-                Response::builder()
-                    .header(CONTENT_TYPE, "video/webm")
-                    .header("X-Accel-Buffering", "no")
-                    .header(CACHE_CONTROL, "no-cache, no-store")
-                    .body(Body::wrap_stream(self.get_stream()))
-                    .unwrap()
-            },
+            (Method::HEAD, "/live") => media_response(Body::empty()),
+            (Method::GET, "/live") => media_response(Body::wrap_stream(self.get_stream())),
             (Method::POST, "/live") | (Method::PUT, "/live") => {
                 println!("[Info] New source on {}", uri.path());
                 Response::new(Body::wrap_stream(self.post_stream(request_body)))
