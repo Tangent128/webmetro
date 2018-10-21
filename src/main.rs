@@ -2,6 +2,7 @@
 extern crate futures;
 extern crate http;
 extern crate hyper;
+extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_io;
 extern crate webmetro;
@@ -9,9 +10,6 @@ extern crate webmetro;
 mod commands;
 
 use clap::{App, AppSettings};
-use futures::prelude::*;
-use hyper::rt;
-use webmetro::error::WebmetroError;
 
 use commands::{
     relay,
@@ -36,25 +34,16 @@ fn main() {
     let args = options().get_matches();
 
     match args.subcommand() {
-        ("filter", Some(sub_args)) => { tokio_run(filter::run(sub_args)); },
-        ("relay", Some(sub_args)) => { relay::run(sub_args).unwrap_or_else(handle_error); },
-        ("send", Some(sub_args)) => { tokio_run(send::run(sub_args)); },
-        ("dump", Some(sub_args)) => { dump::run(sub_args).unwrap_or_else(handle_error); },
+        ("filter", Some(sub_args)) => filter::run(sub_args),
+        ("relay", Some(sub_args)) => relay::run(sub_args),
+        ("send", Some(sub_args)) => send::run(sub_args),
+        ("dump", Some(sub_args)) => dump::run(sub_args),
         _ => {
             options().print_help().unwrap();
             println!("");
+            Ok(())
         }
-    };
-}
-
-fn handle_error(err: WebmetroError) {
-    eprintln!("Error: {}", err);
-}
-
-fn tokio_run<T: IntoFuture<Item=(), Error=WebmetroError> + Send>(task: T)
-where T::Future: Send + 'static {
-    rt::run(task.into_future().map_err(|err| {
-        handle_error(err);
-        ::std::process::exit(1);
-    }));
+    }.unwrap_or_else(|err| {
+        eprintln!("Error: {}", err);
+    });
 }

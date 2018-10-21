@@ -5,6 +5,7 @@ use std::{
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
+use tokio::runtime::Runtime;
 
 use super::stdin_stream;
 use webmetro::{
@@ -25,7 +26,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down output to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-pub fn run(args: &ArgMatches) -> impl Future<Item=(), Error=WebmetroError> + Send {
+pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError> + Send> = Box::new(
         stdin_stream()
         .parse_ebml()
@@ -37,7 +38,7 @@ pub fn run(args: &ArgMatches) -> impl Future<Item=(), Error=WebmetroError> + Sen
         chunk_stream = Box::new(chunk_stream.throttle());
     }
 
-    chunk_stream.for_each(|chunk| {
+    Runtime::new().unwrap().block_on_all(chunk_stream.for_each(|chunk| {
         io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::IoError)
-    })
+    }))
 }

@@ -25,7 +25,6 @@ use hyper::{
     Method,
     Request,
     Response,
-    rt,
     Server,
     service::Service,
     header::{
@@ -33,6 +32,7 @@ use hyper::{
         CONTENT_TYPE
     }
 };
+use tokio::runtime::Runtime;
 use webmetro::{
     channel::{
         Channel,
@@ -138,14 +138,9 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
     let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    rt::run(Server::bind(&addr)
+    Runtime::new().unwrap().block_on_all(Server::bind(&addr)
         .serve(move || {
             ok::<_, WebmetroError>(RelayServer(single_channel.clone()))
-        })
-        .map_err(|err| {
-            println!("[Error] {}", err);
-        })
-    );
-
-    Ok(())
+        }).map_err(|err| WebmetroError::Unknown(Box::new(err)))
+    )
 }

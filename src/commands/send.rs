@@ -1,6 +1,5 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
-    future,
     prelude::*
 };
 use hyper::{
@@ -8,6 +7,7 @@ use hyper::{
     client::HttpConnector,
     Request
 };
+use tokio::runtime::Runtime;
 
 use super::{
     stdin_stream,
@@ -36,7 +36,7 @@ pub fn options() -> App<'static, 'static> {
 
 type BoxedChunkStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send>;
 
-pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send> {
+pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
         .parse_ebml()
@@ -46,7 +46,7 @@ pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send
 
     let url_str = match args.value_of("url") {
         Some(url) => String::from(url),
-        _ => return Box::new(Err(WebmetroError::from_str("Listen address wasn't provided")).into_future())
+        _ => return Err(WebmetroError::from_str("Listen address wasn't provided"))
     };
 
     if args.is_present("throttle") {
@@ -58,18 +58,19 @@ pub fn run(args: &ArgMatches) -> Box<Future<Item=(), Error=WebmetroError> + Send
         err
     }));
 
-    Box::new(future::lazy(move || {
-        Request::put(url_str)
-        .body(request_payload)
-        .map_err(WebmetroError::from_err)
-    }).and_then(|request| {
-        let client = Client::builder().build(HttpConnector::new(1));
-        client.request(request)
-            .and_then(|response| {
-                response.into_body().for_each(|_chunk| {
-                    Ok(())
-                })
-            })
-            .map_err(WebmetroError::from_err)
-    }))
+    
+    let request = Request::put(url_str)
+    .body(request_payload)
+    .map_err(WebmetroError::from_err)?;
+
+    let client = Client::builder().build(HttpConnector::new(1));
+    let future = client.request(request)
+    .and_then(|response| {
+        response.into_body().for_each(|_chunk| {
+            Ok(())
+        })
+    })
+    .map_err(WebmetroError::from_err);
+
+    Runtime::new().unwrap().block_on_all(future)
 }
