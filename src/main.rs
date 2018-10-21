@@ -35,28 +35,26 @@ fn options() -> App<'static, 'static> {
 fn main() {
     let args = options().get_matches();
 
-    tokio_run(match args.subcommand() {
-        ("filter", Some(sub_args)) => box_up(filter::run(sub_args)),
-        ("relay", Some(sub_args)) => box_up(relay::run(sub_args)),
-        ("send", Some(sub_args)) => box_up(send::run(sub_args)),
-        ("dump", Some(sub_args)) => box_up(dump::run(sub_args)),
-        _ => box_up(futures::lazy(|| {
+    match args.subcommand() {
+        ("filter", Some(sub_args)) => { tokio_run(filter::run(sub_args)); },
+        ("relay", Some(sub_args)) => { relay::run(sub_args).unwrap_or_else(handle_error); },
+        ("send", Some(sub_args)) => { tokio_run(send::run(sub_args)); },
+        ("dump", Some(sub_args)) => { dump::run(sub_args).unwrap_or_else(handle_error); },
+        _ => {
             options().print_help().unwrap();
             println!("");
-            Ok(())
-        }))
-    });
+        }
+    };
 }
 
-fn tokio_run(task: Box<Future<Item=(), Error=WebmetroError> + Send>) {
+fn handle_error(err: WebmetroError) {
+    eprintln!("Error: {}", err);
+}
+
+fn tokio_run<T: IntoFuture<Item=(), Error=WebmetroError> + Send>(task: T)
+where T::Future: Send + 'static {
     rt::run(task.into_future().map_err(|err| {
-        eprintln!("Error: {}", err);
+        handle_error(err);
         ::std::process::exit(1);
     }));
-}
-
-fn box_up<F: IntoFuture<Item=(), Error=WebmetroError>>(task: F) -> Box<Future<Item=(), Error=WebmetroError> + Send>
-where F::Future: Send + 'static
-{
-    Box::new(task.into_future())
 }
