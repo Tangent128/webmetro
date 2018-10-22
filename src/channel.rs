@@ -30,8 +30,10 @@ pub struct Channel {
     listeners: Vec<Sender<Chunk>>
 }
 
+pub type Handle = Arc<Mutex<Channel>>;
+
 impl Channel {
-    pub fn new() -> Arc<Mutex<Channel>> {
+    pub fn new() -> Handle {
         Arc::new(Mutex::new(Channel {
             header_chunk: None,
             listeners: Vec::new()
@@ -40,11 +42,11 @@ impl Channel {
 }
 
 pub struct Transmitter {
-    channel: Arc<Mutex<Channel>>
+    channel: Handle
 }
 
 impl Transmitter {
-    pub fn new(channel_arc: Arc<Mutex<Channel>>) -> Self {
+    pub fn new(channel_arc: Handle) -> Self {
         Transmitter {
             channel: channel_arc
         }
@@ -77,12 +79,12 @@ impl Sink for Transmitter {
 
 pub struct Listener {
     /// not used in operation, but its refcount keeps the channel alive when there's no Transmitter
-    _channel: Arc<Mutex<Channel>>,
+    _channel: Handle,
     receiver: Receiver<Chunk>
 }
 
 impl Listener {
-    pub fn new(channel_arc: Arc<Mutex<Channel>>) -> Self {
+    pub fn new(channel_arc: Handle) -> Self {
         let (mut sender, receiver) = mpsc_channel(5);
 
         {
