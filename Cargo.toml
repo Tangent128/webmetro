@@ -12,5 +12,5 @@ hyper = "0.12"
 odds = { version = "0.3.1", features = ["std-vec"] }
 tokio = "0.1.11"
 tokio-codec = "0.1.1"
-tokio-io = "0.1.9"
+tokio-io = "0.1.10"
 warp = "0.1"
