@@ -26,6 +26,7 @@ pub enum Never {}
 /// case, there's nothing practical the server can do to recover,
 /// so the failing client is just dropped from the listener list.
 pub struct Channel {
+    pub name: String,
     header_chunk: Option<Chunk>,
     listeners: Vec<Sender<Chunk>>
 }
@@ -33,8 +34,9 @@ pub struct Channel {
 pub type Handle = Arc<Mutex<Channel>>;
 
 impl Channel {
-    pub fn new() -> Handle {
+    pub fn new(name: String) -> Handle {
         Arc::new(Mutex::new(Channel {
+            name,
             header_chunk: None,
             listeners: Vec::new()
         }))

@@ -1,6 +1,6 @@
 [package]
 name = "webmetro"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tangent 128 <Tangent128@gmail.com>"]
 
 [dependencies]
@@ -14,3 +14,4 @@ tokio = "0.1.11"
 tokio-codec = "0.1.1"
 tokio-io = "0.1.10"
 warp = "0.1"
+weak-table = "0.2"

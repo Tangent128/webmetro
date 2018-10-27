@@ -7,6 +7,7 @@ extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_io;
 #[macro_use] extern crate warp;
+extern crate weak_table;
 extern crate webmetro;
 
 mod commands;

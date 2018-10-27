@@ -1,5 +1,10 @@
 use std::error::Error;
 use std::net::ToSocketAddrs;
+use std::sync::{
+    Arc,
+    Mutex,
+    Weak
+};
 
 use bytes::{Bytes, Buf};
 use clap::{App, Arg, ArgMatches, SubCommand};
@@ -20,6 +25,9 @@ use hyper::{
 use warp::{
     self,
     Filter
+};
+use weak_table::{
+    WeakValueHashMap
 };
 use webmetro::{
     channel::{
@@ -79,22 +87,33 @@ pub fn options() -> App<'static, 'static> {
 }
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
-    let single_channel = Channel::new();
+    let channel_map = Arc::new(Mutex::new(WeakValueHashMap::<String, Weak<Mutex<Channel>>>::new()));
 
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
     let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
 
-    let channel = path!("live").map(move || single_channel.clone());
+    let channel = path!("live" / String).map(move |name: String| {
+        let channel = channel_map.lock().unwrap()
+            .entry(name.clone())
+            .or_insert_with(|| Channel::new(name.clone()));
+        (channel, name)
+    });
 
     let head = channel.clone().and(warp::head())
-        .map(|_| media_response(Body::empty()));
+        .map(|(_, name)| {
+            println!("[Info] HEAD Request For Channel {}", name);
+            media_response(Body::empty())
+        });
 
     let get = channel.clone().and(warp::get2())
-        .map(|channel| media_response(Body::wrap_stream(get_stream(channel))));
+        .map(|(channel, name)| {
+            println!("[Info] Listener Connected On Channel {}", name);
+            media_response(Body::wrap_stream(get_stream(channel)))
+        });
 
     let post_put = channel.clone().and(warp::post2().or(warp::put2()).unify())
-        .and(warp::body::stream()).map(|channel, stream| {
-            println!("[Info] Source Connected");
+        .and(warp::body::stream()).map(|(channel, name), stream| {
+            println!("[Info] Source Connected On Channel {}", name);
             Response::new(Body::wrap_stream(post_stream(channel, stream)))
         });
 
