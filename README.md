@@ -22,19 +22,19 @@ Launch a relay server with the `relay` subcommand:
 
 `webmetro relay localhost:8080`
 
-At this point you can open http://localhost:8080/live in a web browser.
+At this point you can open http://localhost:8080/live/main in a web browser. (Or replace "main" with any stream name you like)
 
 Next, a source client will need to `POST` or `PUT` a stream to that URL; a static file can be uploaded with the `send` subcommand:
 
-`webmetro send --throttle http://localhost:8080/live < file.webm`
+`webmetro send --throttle http://localhost:8080/live/main < file.webm`
 
 You can even glue together multiple files, provided they share the same codecs and track order:
 
-`cat 1.webm 2.webm 3.webm | webmetro send --throttle http://localhost:8080/live`
+`cat 1.webm 2.webm 3.webm | webmetro send --throttle http://localhost:8080/live/main`
 
 You can use ffmpeg to transcode a non-WebM file or access a media device:
 
-`ffmpeg -i file.mp4 -deadline realtime -threads 4 -vb 700k -vcodec libvpx -f webm -live 1 - | webmetro send --throttle http://localhost:8080/live`
+`ffmpeg -i file.mp4 -deadline realtime -threads 4 -vb 700k -vcodec libvpx -f webm -live 1 - | webmetro send --throttle http://localhost:8080/live/main`
 
 (if the source is itself a live stream, you can leave off the `--throttle` flag)
 
@@ -42,7 +42,6 @@ You can use ffmpeg to transcode a non-WebM file or access a media device:
 
 * HTTPS is not supported yet. It really should be. (see "Nginx Proxying" below, though)
 * There aren't any access controls on either the source or viewer roles yet. (see "Nginx Proxying" below, though)
-* Currently the server only recognizes a single stream, at `/live`.
 * The server tries to start a viewer at a cluster containing a keyframe; it is not yet smart enough to ensure that the keyframe belongs to the *video* stream.
 * The server doesn't parse any metadata, such as tags; the Info segment is stripped out, everything else is blindly passed along.
 * The server drops any source that it feels uses too much buffer space. This is not yet configurable, though sane files probably won't hit the limit. (Essentially, clusters & the initialization segment can't individually be more than 2M)
