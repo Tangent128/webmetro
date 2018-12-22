@@ -1,9 +1,4 @@
 
-extern crate bytes;
-extern crate futures;
-extern crate odds;
-extern crate tokio;
-
 pub mod ebml;
 pub mod error;
 pub mod iterator;
