@@ -16,7 +16,7 @@ use futures::{
 };
 use odds::vec::VecExt;
 
-use chunk::Chunk;
+use crate::chunk::Chunk;
 
 pub enum Never {}
 

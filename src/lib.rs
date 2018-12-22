@@ -16,7 +16,7 @@ pub mod webm;
 
 pub mod channel;
 
-pub use ebml::{EbmlError, FromEbml};
+pub use crate::ebml::{EbmlError, FromEbml};
 
 #[cfg(test)]
 mod tests {

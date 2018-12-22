@@ -1,8 +1,8 @@
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
 use bytes::{BigEndian, BufMut, ByteOrder};
-use ebml::*;
-use iterator::ebml_iter;
-use iterator::EbmlIterator;
+use crate::ebml::*;
+use crate::iterator::ebml_iter;
+use crate::iterator::EbmlIterator;
 
 const SEGMENT_ID: u64 = 0x08538067;
 const SEEK_HEAD_ID: u64 = 0x014D9B74;
@@ -131,11 +131,11 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
 
 #[cfg(test)]
 mod tests {
-    use tests::{
+    use crate::tests::{
         TEST_FILE,
         ENCODE_WEBM_TEST_FILE
     };
-    use webm::*;
+    use crate::webm::*;
 
     #[test]
     fn decode_webm_test1() {

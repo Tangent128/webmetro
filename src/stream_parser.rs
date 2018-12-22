@@ -8,11 +8,11 @@ use futures::{
     stream::Stream
 };
 
-use ebml::{
+use crate::ebml::{
     EbmlEventSource,
     FromEbml
 };
-use error::WebmetroError;
+use crate::error::WebmetroError;
 
 pub struct EbmlStreamingParser<S> {
     stream: S,
@@ -79,7 +79,7 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> 
                     self.buffer.put(buf);
                     // ok can retry decoding now
                 },
-                other => return other.map(|async| async.map(|_| None))
+                other => return other.map(|async_status| async_status.map(|_| None))
             }
         }
     }

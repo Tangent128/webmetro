@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use ebml::FromEbml;
+use crate::ebml::FromEbml;
 
 pub struct EbmlIterator<'a, T: FromEbml<'a>>(&'a [u8], PhantomData<fn() -> T>);
 

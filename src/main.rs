@@ -14,7 +14,7 @@ mod commands;
 
 use clap::{App, AppSettings};
 
-use commands::{
+use crate::commands::{
     relay,
     filter,
     send,

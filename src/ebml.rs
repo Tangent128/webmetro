@@ -305,11 +305,11 @@ pub trait EbmlEventSource {
 #[cfg(test)]
 mod tests {
     use bytes::{BytesMut};
-    use ebml::*;
-    use ebml::EbmlError::{CorruptVarint, UnknownElementId};
-    use ebml::Varint::{Unknown, Value};
+    use crate::ebml::*;
+    use crate::ebml::EbmlError::{CorruptVarint, UnknownElementId};
+    use crate::ebml::Varint::{Unknown, Value};
     use std::io::Cursor;
-    use tests::TEST_FILE;
+    use crate::tests::TEST_FILE;
 
     #[test]
     fn fail_corrupted_varints() {
