@@ -313,27 +313,27 @@ mod tests {
 
     #[test]
     fn fail_corrupted_varints() {
-        assert_eq!(decode_varint(&[0]), Err(CorruptVarint));
-        assert_eq!(decode_varint(&[0, 0, 0]), Err(CorruptVarint));
+        if let Err(CorruptVarint) = decode_varint(&[0]) {} else {assert!(false)}
+        if let Err(CorruptVarint) = decode_varint(&[0, 0, 0]) {} else {assert!(false)}
     }
 
     #[test]
     fn incomplete_varints() {
-        assert_eq!(decode_varint(&[]), Ok(None));
-        assert_eq!(decode_varint(&[0x40]), Ok(None));
-        assert_eq!(decode_varint(&[0x01, 0, 0]), Ok(None));
+        assert!(decode_varint(&[]).unwrap().is_none());
+        assert!(decode_varint(&[0x40]).unwrap().is_none());
+        assert!(decode_varint(&[0x01, 0, 0]).unwrap().is_none());
     }
 
     #[test]
     fn parse_varints() {
-        assert_eq!(decode_varint(&[0xFF]), Ok(Some((Unknown, 1))));
-        assert_eq!(decode_varint(&[0x7F, 0xFF]), Ok(Some((Unknown, 2))));
-        assert_eq!(decode_varint(&[0x80]), Ok(Some((Value(0), 1))));
-        assert_eq!(decode_varint(&[0x81]), Ok(Some((Value(1), 1))));
-        assert_eq!(decode_varint(&[0x40, 52]), Ok(Some((Value(52), 2))));
+        if let Ok(Some((Unknown, 1))) = decode_varint(&[0xFF]) {} else {assert!(false)}
+        if let Ok(Some((Unknown, 2))) = decode_varint(&[0x7F, 0xFF]) {} else {assert!(false)}
+        if let Ok(Some((Value(0), 1))) = decode_varint(&[0x80]) {} else {assert!(false)}
+        if let Ok(Some((Value(1), 1))) = decode_varint(&[0x81]) {} else {assert!(false)}
+        if let Ok(Some((Value(52), 2))) = decode_varint(&[0x40, 52]) {} else {assert!(false)}
 
         // test extra data in buffer
-        assert_eq!(decode_varint(&[0x83, 0x11]), Ok(Some((Value(3), 1))));
+        if let Ok(Some((Value(3), 1))) = decode_varint(&[0x83, 0x11]) {} else {assert!(false)}
     }
 
     #[test]
@@ -405,45 +405,45 @@ mod tests {
 
     #[test]
     fn fail_corrupted_tags() {
-        assert_eq!(decode_tag(&[0]), Err(CorruptVarint));
-        assert_eq!(decode_tag(&[0x80, 0]), Err(CorruptVarint));
-        assert_eq!(decode_tag(&[0xFF, 0x80]), Err(UnknownElementId));
-        assert_eq!(decode_tag(&[0x7F, 0xFF, 0x40, 0]), Err(UnknownElementId));
+        if let Err(CorruptVarint) = decode_tag(&[0]) {} else {assert!(false)}
+        if let Err(CorruptVarint) = decode_tag(&[0x80, 0]) {} else {assert!(false)}
+        if let Err(UnknownElementId) = decode_tag(&[0xFF, 0x80]) {} else {assert!(false)}
+        if let Err(UnknownElementId) = decode_tag(&[0x7F, 0xFF, 0x40, 0]) {} else {assert!(false)}
     }
 
     #[test]
     fn incomplete_tags() {
-        assert_eq!(decode_tag(&[]), Ok(None));
-        assert_eq!(decode_tag(&[0x80]), Ok(None));
-        assert_eq!(decode_tag(&[0x40, 0, 0x40]), Ok(None));
+        assert!(decode_tag(&[]).unwrap().is_none());
+        assert!(decode_tag(&[0x80]).unwrap().is_none());
+        assert!(decode_tag(&[0x40, 0, 0x40]).unwrap().is_none());
     }
 
     #[test]
     fn parse_tags() {
-        assert_eq!(decode_tag(&[0x80, 0x80]), Ok(Some((0, Value(0), 2))));
-        assert_eq!(decode_tag(&[0x81, 0x85]), Ok(Some((1, Value(5), 2))));
-        assert_eq!(decode_tag(&[0x80, 0xFF]), Ok(Some((0, Unknown, 2))));
-        assert_eq!(decode_tag(&[0x80, 0x7F, 0xFF]), Ok(Some((0, Unknown, 3))));
-        assert_eq!(decode_tag(&[0x85, 0x40, 52]), Ok(Some((5, Value(52), 3))));
+        if let Ok(Some((0, Value(0), 2))) = decode_tag(&[0x80, 0x80]) {} else {assert!(false)}
+        if let Ok(Some((1, Value(5), 2))) = decode_tag(&[0x81, 0x85]) {} else {assert!(false)}
+        if let Ok(Some((0, Unknown, 2))) = decode_tag(&[0x80, 0xFF]) {} else {assert!(false)}
+        if let Ok(Some((0, Unknown, 3))) = decode_tag(&[0x80, 0x7F, 0xFF]) {} else {assert!(false)}
+        if let Ok(Some((5, Value(52), 3))) = decode_tag(&[0x85, 0x40, 52]) {} else {assert!(false)}
     }
 
     #[test]
     fn bad_uints() {
-        assert_eq!(decode_uint(&[]), Err(EbmlError::CorruptPayload));
-        assert_eq!(decode_uint(&[0; 9]), Err(EbmlError::CorruptPayload));
+        if let Err(EbmlError::CorruptPayload) = decode_uint(&[]) {} else {assert!(false)}
+        if let Err(EbmlError::CorruptPayload) = decode_uint(&[0; 9]) {} else {assert!(false)}
     }
 
     #[test]
     fn parse_uints() {
-        assert_eq!(decode_uint(&[0]), Ok(0));
-        assert_eq!(decode_uint(&[0; 8]), Ok(0));
-        assert_eq!(decode_uint(&[1]), Ok(1));
-        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,1]), Ok(1));
-        assert_eq!(decode_uint(&[38]), Ok(38));
-        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,38]), Ok(38));
-        assert_eq!(decode_uint(&[0x7F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]), Ok(9223372036854775807));
-        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,0]), Ok(9223372036854775808));
-        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,1]), Ok(9223372036854775809));
+        assert_eq!(decode_uint(&[0]).unwrap(), 0);
+        assert_eq!(decode_uint(&[0; 8]).unwrap(), 0);
+        assert_eq!(decode_uint(&[1]).unwrap(), 1);
+        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,1]).unwrap(), 1);
+        assert_eq!(decode_uint(&[38]).unwrap(), 38);
+        assert_eq!(decode_uint(&[0,0,0,0,0,0,0,38]).unwrap(), 38);
+        assert_eq!(decode_uint(&[0x7F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]).unwrap(), 9223372036854775807);
+        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,0]).unwrap(), 9223372036854775808);
+        assert_eq!(decode_uint(&[0x80,0,0,0,0,0,0,1]).unwrap(), 9223372036854775809);
     }
 
     #[derive(Debug, PartialEq)]
@@ -466,6 +466,6 @@ mod tests {
     #[test]
     fn decode_sanity_test() {
         let decoded = GenericElement::decode_element(TEST_FILE);
-        assert_eq!(decoded, Ok(Some((GenericElement(0x0A45DFA3, 31), 43))));
+        if let Ok(Some((GenericElement(0x0A45DFA3, 31), 43))) = decoded {} else {assert!(false)}
     }
 }
