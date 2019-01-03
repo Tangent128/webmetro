@@ -55,9 +55,9 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> 
                 Ok(None) => {
                     // need to refill buffer, below
                 },
-                other => return other.map_err(WebmetroError::EbmlError).and_then(move |_| {
+                other => return other.map_err(WebmetroError::from).and_then(move |_| {
                     match T::decode_element(&self.buffer) {
-                        Err(err) => Err(WebmetroError::EbmlError(err)),
+                        Err(err) => Err(err.into()),
                         Ok(None) => panic!("Buffer was supposed to have enough data to parse element, somehow did not."),
                         Ok(Some((element, element_size))) => {
                             self.last_read = element_size;

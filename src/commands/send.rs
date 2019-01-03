@@ -46,7 +46,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let url_str = match args.value_of("url") {
         Some(url) => String::from(url),
-        _ => return Err(WebmetroError::from_str("Listen address wasn't provided"))
+        _ => return Err("Listen address wasn't provided".into())
     };
 
     if args.is_present("throttle") {
@@ -63,7 +63,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     
     let request = Request::put(url_str)
     .body(request_payload)
-    .map_err(WebmetroError::from_err)?;
+    .map_err(WebmetroError::from)?;
 
     let client = Client::builder().build(HttpConnector::new(1));
     let future = client.request(request)
@@ -72,7 +72,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
             Ok(())
         })
     })
-    .map_err(WebmetroError::from_err);
+    .map_err(WebmetroError::from);
 
     Runtime::new().unwrap().block_on(future)
 }

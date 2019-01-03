@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::net::ToSocketAddrs;
 use std::sync::{
     Arc,
@@ -53,9 +52,9 @@ fn get_stream(channel: Handle) -> impl Stream<Item = Bytes, Error = WebmetroErro
     .map_err(|err| match err {})
 }
 
-fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = impl Error + Send + Sync + 'static>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
+fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = warp::Error>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
     let source = stream
-        .map_err(WebmetroError::from_err)
+        .map_err(WebmetroError::from)
         .parse_ebml().with_soft_limit(BUFFER_LIMIT)
         .chunk_webm().with_soft_limit(BUFFER_LIMIT);
     let sink = Transmitter::new(channel);

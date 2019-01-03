@@ -23,5 +23,5 @@ pub mod send;
 pub fn stdin_stream() -> impl Stream<Item = impl Buf, Error = WebmetroError> {
     FramedRead::new(AllowStdIo::new(stdin()), BytesCodec::new())
     .map(|bytes| bytes.into_buf())
-    .map_err(WebmetroError::IoError)
+    .map_err(WebmetroError::from)
 }
