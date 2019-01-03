@@ -1,6 +1,5 @@
 use bytes::{BigEndian, ByteOrder, BufMut};
-use std::error::Error as ErrorTrait;
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use custom_error::custom_error;
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
 use futures::Async;
 
@@ -8,46 +7,15 @@ pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
 pub const VOID_ID: u64 = 0x6C;
 
-#[derive(Debug, PartialEq)]
-pub enum EbmlError {
-    CorruptVarint,
-    UnknownElementId,
-    UnknownElementLength,
-    CorruptPayload,
-}
-impl Display for EbmlError {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.description())
-    }
-}
-impl ErrorTrait for EbmlError {
-    fn description(&self) -> &str {
-        match self {
-            &EbmlError::CorruptVarint => "EBML Varint could not be parsed",
-            &EbmlError::UnknownElementId => "EBML element ID was \"unknown\"",
-            &EbmlError::UnknownElementLength => "EBML element length was \"unknown\" for an element not allowing that",
-            &EbmlError::CorruptPayload => "EBML element payload could not be parsed",
-        }
-    }
+custom_error!{pub EbmlError
+    CorruptVarint        = r#"EBML Varint could not be parsed"#,
+    UnknownElementId     = r#"EBML element ID was "unknown"#,
+    UnknownElementLength = r#"EBML element length was "unknown" for an element not allowing that"#,
+    CorruptPayload       = r#"EBML element payload could not be parsed"#,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum WriteError {
-    OutOfRange
-}
-impl Display for WriteError {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        match self {
-            &WriteError::OutOfRange => write!(f, "EBML Varint out of range")
-        }
-    }
-}
-impl ErrorTrait for WriteError {
-    fn description(&self) -> &str {
-        match self {
-            &WriteError::OutOfRange => "EBML Varint out of range"
-        }
-    }
+custom_error!{pub WriteError
+    OutOfRange = "EBML Varint out of range"
 }
 
 #[derive(Debug, PartialEq)]
