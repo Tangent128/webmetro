@@ -8,7 +8,7 @@ use std::{
     io::Error as IoError
 };
 
-use ebml::EbmlError;
+use crate::ebml::EbmlError;
 
 #[derive(Debug)]
 pub enum WebmetroError {

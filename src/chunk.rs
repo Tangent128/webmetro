@@ -4,9 +4,9 @@ use std::{
     io::Cursor,
     mem
 };
-use ebml::EbmlEventSource;
-use error::WebmetroError;
-use webm::*;
+use crate::ebml::EbmlEventSource;
+use crate::error::WebmetroError;
+use crate::webm::*;
 
 #[derive(Clone, Debug)]
 pub struct ClusterHead {
@@ -281,7 +281,7 @@ impl<T: EbmlEventSource> WebmStream for T {}
 #[cfg(test)]
 mod tests {
 
-    use chunk::*;
+    use crate::chunk::*;
 
     #[test]
     fn enough_space_for_header() {

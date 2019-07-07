@@ -1,9 +1,4 @@
 
-extern crate bytes;
-extern crate futures;
-extern crate odds;
-extern crate tokio;
-
 pub mod ebml;
 pub mod error;
 pub mod iterator;
@@ -16,7 +11,7 @@ pub mod webm;
 
 pub mod channel;
 
-pub use ebml::{EbmlError, FromEbml};
+pub use crate::ebml::{EbmlError, FromEbml};
 
 #[cfg(test)]
 mod tests {

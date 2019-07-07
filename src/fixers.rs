@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 use futures::prelude::*;
 use tokio::timer::Delay;
 
-use chunk::Chunk;
-use error::WebmetroError;
+use crate::chunk::Chunk;
+use crate::error::WebmetroError;
 
 pub struct ChunkTimecodeFixer<S> {
     stream: S,

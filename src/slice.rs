@@ -1,8 +1,8 @@
 use futures::Async;
 
-use ebml::EbmlError;
-use ebml::EbmlEventSource;
-use ebml::FromEbml;
+use crate::ebml::EbmlError;
+use crate::ebml::EbmlEventSource;
+use crate::ebml::FromEbml;
 
 pub struct EbmlSlice<'a>(pub &'a [u8]);
 

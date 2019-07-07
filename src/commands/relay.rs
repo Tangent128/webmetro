@@ -24,7 +24,8 @@ use hyper::{
 };
 use warp::{
     self,
-    Filter
+    Filter,
+    path
 };
 use weak_table::{
     WeakValueHashMap

@@ -1,20 +1,9 @@
-extern crate bytes;
-#[macro_use] extern crate clap;
-extern crate futures;
-extern crate http;
-extern crate hyper;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_io;
-#[macro_use] extern crate warp;
-extern crate weak_table;
-extern crate webmetro;
 
 mod commands;
 
-use clap::{App, AppSettings};
+use clap::{App, AppSettings, crate_version};
 
-use commands::{
+use crate::commands::{
     relay,
     filter,
     send,
