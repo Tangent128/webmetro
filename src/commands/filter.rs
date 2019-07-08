@@ -39,6 +39,6 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     }
 
     Runtime::new().unwrap().block_on(chunk_stream.for_each(|chunk| {
-        io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::IoError)
+        io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::from)
     }))
 }

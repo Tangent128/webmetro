@@ -98,7 +98,7 @@ impl<S: Stream<Item = Chunk, Error = WebmetroError>> Stream for Throttle<S>
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, WebmetroError> {
         match self.sleep.poll() {
-            Err(err) => return Err(WebmetroError::Unknown(Box::new(err))),
+            Err(err) => return Err(err.into()),
             Ok(Async::NotReady) => return Ok(Async::NotReady),
             Ok(Async::Ready(())) => { /* can continue */ }
         }
