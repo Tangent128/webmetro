@@ -27,7 +27,7 @@ pub fn options() -> App<'static, 'static> {
 }
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
-    let mut chunk_stream: Box<Stream<Item = Chunk, Error = WebmetroError> + Send> = Box::new(
+    let mut chunk_stream: Box<dyn Stream<Item = Chunk, Error = WebmetroError> + Send> = Box::new(
         stdin_stream()
         .parse_ebml()
         .chunk_webm()

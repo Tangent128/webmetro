@@ -34,7 +34,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down upload to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-type BoxedChunkStream = Box<Stream<Item = Chunk, Error = WebmetroError> + Send>;
+type BoxedChunkStream = Box<dyn Stream<Item = Chunk, Error = WebmetroError> + Send>;
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut chunk_stream: BoxedChunkStream = Box::new(
