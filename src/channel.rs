@@ -1,20 +1,23 @@
+use std::pin::Pin;
+use std::task::{
+    Context,
+    Poll
+};
 use std::sync::{
     Arc,
     Mutex
 };
 
-use futures::{
-    Async,
-    AsyncSink,
-    Sink,
-    Stream,
-    sync::mpsc::{
+use futures3::{
+    channel::mpsc::{
         channel as mpsc_channel,
         Sender,
         Receiver
-    }
+    },
+    Sink,
+    Stream,
+    Never
 };
-use futures3::Never;
 use odds::vec::VecExt;
 
 use crate::chunk::Chunk;
@@ -54,11 +57,14 @@ impl Transmitter {
     }
 }
 
-impl Sink for Transmitter {
-    type SinkItem = Chunk;
-    type SinkError = Never; // never errors, slow clients are simply dropped
+impl Sink<Chunk> for Transmitter {
+    type Error = Never; // never errors, slow clients are simply dropped
 
-    fn start_send(&mut self, chunk: Chunk) -> Result<AsyncSink<Chunk>, Never> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Never>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, chunk: Chunk) -> Result<(), Never> {
         let mut channel = self.channel.lock().expect("Locking channel");
 
         if let Chunk::Headers { .. } = chunk {
@@ -67,14 +73,34 @@ impl Sink for Transmitter {
 
         channel.listeners.retain_mut(|listener| listener.start_send(chunk.clone()).is_ok());
 
-        Ok(AsyncSink::Ready)
+        Ok(())
     }
-    fn poll_complete(&mut self) -> Result<Async<()>, Never> {
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Never>> {
+        let mut channel = self.channel.lock().expect("Locking channel");
+        let mut result = Poll::Ready(Ok(()));
+
+        // just disconnect any erroring listeners
+        channel.listeners.retain_mut(|listener| match Pin::new(listener).poll_flush(cx) {
+            Poll::Pending => {result = Poll::Pending; true},
+            Poll::Ready(Ok(())) => true,
+            Poll::Ready(Err(_)) => false,
+        });
+
+        result
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Never>> {
         let mut channel = self.channel.lock().expect("Locking channel");
 
-        channel.listeners.retain_mut(|listener| listener.poll_complete().is_ok());
+        // there's no useful error we can offer here, just give everything a chance to try closing
+        channel.listeners.retain_mut(|listener| Pin::new(listener).poll_close(cx).is_pending());
 
-        Ok(Async::Ready(()))
+        return if channel.listeners.len() > 0 {
+            Poll::Pending
+        } else {
+            Poll::Ready(Ok(()))
+        }
     }
 }
 
@@ -107,9 +133,9 @@ impl Listener {
 
 impl Stream for Listener {
     type Item = Chunk;
-    type Error = Never; // no transmitter errors are exposed to the listeners
 
-    fn poll(&mut self) -> Result<Async<Option<Chunk>>, Never> {
-        Ok(self.receiver.poll().expect("Channel receiving can't error"))
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Chunk>> {
+        let receiver = &mut self.get_mut().receiver;
+        Pin::new(receiver).poll_next(cx)
     }
 }

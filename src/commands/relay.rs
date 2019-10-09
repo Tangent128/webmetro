@@ -13,6 +13,14 @@ use futures::{
     Sink,
     stream::empty
 };
+use futures3::{
+    compat::{
+        Compat,
+        CompatSink,
+    },
+    Never,
+    StreamExt
+};
 use hyper::{
     Body,
     Response,
@@ -45,11 +53,11 @@ use webmetro::{
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
 fn get_stream(channel: Handle) -> impl Stream<Item = Bytes, Error = WebmetroError> {
-    Listener::new(channel)
+    Compat::new(Listener::new(channel).map(|c| Ok(c)))
     .fix_timecodes()
     .find_starting_point()
     .map(|webm_chunk| webm_chunk.into_bytes())
-    .map_err(|err| match err {})
+    .map_err(|err: Never| match err {})
 }
 
 fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = warp::Error>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
@@ -57,7 +65,7 @@ fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = war
         .map_err(WebmetroError::from)
         .parse_ebml().with_soft_limit(BUFFER_LIMIT)
         .chunk_webm().with_soft_limit(BUFFER_LIMIT);
-    let sink = Transmitter::new(channel);
+    let sink = CompatSink::new(Transmitter::new(channel));
 
     source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
     .into_stream()
