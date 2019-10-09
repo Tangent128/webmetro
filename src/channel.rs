@@ -14,11 +14,10 @@ use futures::{
         Receiver
     }
 };
+use futures3::Never;
 use odds::vec::VecExt;
 
 use crate::chunk::Chunk;
-
-pub enum Never {}
 
 /// A collection of listeners to a stream of WebM chunks.
 /// Sending a chunk may fail due to a client being disconnected,
