@@ -2,6 +2,10 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
     prelude::*
 };
+use futures3::compat::{
+    Compat,
+    Compat01As03
+};
 use hyper::{
     Body,
     Client,
@@ -19,7 +23,10 @@ use webmetro::{
         WebmStream
     },
     error::WebmetroError,
-    fixers::ChunkStream,
+    fixers::{
+        ChunkStream,
+        ChunkTimecodeFixer,
+    },
     stream_parser::StreamEbml
 };
 
@@ -37,11 +44,12 @@ pub fn options() -> App<'static, 'static> {
 type BoxedChunkStream = Box<dyn Stream<Item = Chunk, Error = WebmetroError> + Send>;
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+    let mut timecode_fixer = ChunkTimecodeFixer::new();
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
         .parse_ebml()
         .chunk_webm()
-        .fix_timecodes()
+        .map(move |chunk| timecode_fixer.process(chunk))
     );
 
     let url_str = match args.value_of("url") {
@@ -50,7 +58,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     };
 
     if args.is_present("throttle") {
-        chunk_stream = Box::new(chunk_stream.throttle());
+        chunk_stream = Box::new(Compat::new(Compat01As03::new(chunk_stream).throttle()));
     }
 
     let request_payload = Body::wrap_stream(chunk_stream.map(

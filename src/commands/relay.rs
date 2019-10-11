@@ -19,6 +19,7 @@ use futures3::{
         CompatSink,
     },
     Never,
+    prelude::*,
     StreamExt
 };
 use hyper::{
@@ -46,18 +47,22 @@ use webmetro::{
     },
     chunk::WebmStream,
     error::WebmetroError,
-    fixers::ChunkStream,
+    fixers::{
+        ChunkStream,
+        ChunkTimecodeFixer,
+    },
     stream_parser::StreamEbml
 };
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
 fn get_stream(channel: Handle) -> impl Stream<Item = Bytes, Error = WebmetroError> {
-    Compat::new(Listener::new(channel).map(|c| Ok(c)))
-    .fix_timecodes()
+    let mut timecode_fixer = ChunkTimecodeFixer::new();
+    Compat::new(Listener::new(channel).map(|c| Ok(c))
+    .map_ok(move |chunk| timecode_fixer.process(chunk))
     .find_starting_point()
-    .map(|webm_chunk| webm_chunk.into_bytes())
-    .map_err(|err: Never| match err {})
+    .map_ok(|webm_chunk| webm_chunk.into_bytes())
+    .map_err(|err: Never| match err {}))
 }
 
 fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = warp::Error>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
