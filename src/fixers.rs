@@ -99,6 +99,17 @@ pub struct Throttle<S> {
     sleep: Delay
 }
 
+impl<S> Throttle<S> {
+    pub fn new(wrap: S) -> Throttle<S> {
+        let now = Instant::now();
+        Throttle {
+            stream: wrap,
+            start_time: now,
+            sleep: delay(now)
+        }
+    }
+}
+
 impl<S: TryStream<Ok = Chunk, Error = WebmetroError> + Unpin> Stream for Throttle<S>
 {
     type Item = Result<Chunk, WebmetroError>;
@@ -138,12 +149,7 @@ pub trait ChunkStream where Self : Sized + TryStream<Ok = Chunk> {
     }
 
     fn throttle(self) -> Throttle<Self> {
-        let now = Instant::now();
-        Throttle {
-            stream: self,
-            start_time: now,
-            sleep: delay(now)
-        }
+        Throttle::new(self)
     }
 }
 
