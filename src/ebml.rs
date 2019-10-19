@@ -198,9 +198,9 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
 }
 
 pub struct EbmlLayout {
-    element_id: u64,
-    body_offset: usize,
-    element_len: usize,
+    pub element_id: u64,
+    pub body_offset: usize,
+    pub element_len: usize,
 }
 
 pub trait FromEbml<'a>: Sized {
