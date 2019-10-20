@@ -249,26 +249,11 @@ pub trait FromEbml<'a>: Sized {
 
     /// Attempt to construct an instance of this type from the given byte slice
     fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, EbmlError> {
-        match decode_tag(bytes) {
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-            Ok(Some((element_id, payload_size_tag, tag_size))) => {
-                let should_unwrap = Self::should_unwrap(element_id);
-
-                let payload_size = match (should_unwrap, payload_size_tag) {
-                    (true, _) => 0,
-                    (false, Varint::Unknown) => return Err(EbmlError::UnknownElementLength),
-                    (false, Varint::Value(size)) => size as usize
-                };
-
-                let element_size = tag_size + payload_size;
-                if element_size > bytes.len() {
-                    // need to read more still
-                    return Ok(None);
-                }
-
-                match Self::decode(element_id, &bytes[tag_size..element_size]) {
-                    Ok(element) => Ok(Some((element, element_size))),
+        match Self::check_space(bytes)? {
+            None => Ok(None),
+            Some(info) => {
+                match Self::decode(info.element_id, &bytes[info.body_offset..info.element_len]) {
+                    Ok(element) => Ok(Some((element, info.element_len))),
                     Err(error) => Err(error)
                 }
             }
