@@ -197,6 +197,12 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
     output.write_all(&buffer.get_ref()[..])
 }
 
+pub struct EbmlLayout {
+    element_id: u64,
+    body_offset: usize,
+    element_len: usize,
+}
+
 pub trait FromEbml<'a>: Sized {
     /// Indicates if this tag's contents should be treated as a blob,
     /// or if the tag header should be reported as an event and with further
@@ -210,13 +216,14 @@ pub trait FromEbml<'a>: Sized {
     /// references into the given buffer.
     fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, EbmlError>;
 
-    /// Check if enough space exists in the given buffer for decode_element() to
-    /// be successful; parsing errors will be returned eagerly.
-    fn check_space(bytes: &[u8]) -> Result<Option<usize>, EbmlError> {
+    /// Check if enough space exists in the given buffer to decode an element;
+    /// it will not actually call `decode` or try to construct an instance,
+    /// but EBML errors with the next tag header will be returned eagerly.
+    fn check_space(bytes: &[u8]) -> Result<Option<EbmlLayout>, EbmlError> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
-            Ok(Some((element_id, payload_size_tag, tag_size))) => {
+            Ok(Some((element_id, payload_size_tag, body_offset))) => {
                 let should_unwrap = Self::should_unwrap(element_id);
 
                 let payload_size = match (should_unwrap, payload_size_tag) {
@@ -225,12 +232,16 @@ pub trait FromEbml<'a>: Sized {
                     (false, Varint::Value(size)) => size as usize
                 };
 
-                let element_size = tag_size + payload_size;
-                if element_size > bytes.len() {
+                let element_len = body_offset + payload_size;
+                if element_len > bytes.len() {
                     // need to read more still
                     Ok(None)
                 } else {
-                    Ok(Some(element_size))
+                    Ok(Some(EbmlLayout {
+                        element_id,
+                        body_offset,
+                        element_len
+                    }))
                 }
             }
         }
