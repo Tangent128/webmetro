@@ -95,6 +95,58 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlEventSource for Ebm
 
 #[cfg(test)]
 mod tests {
-    //#[test]
-    
+    use bytes::IntoBuf;
+    use futures::prelude::*;
+    use futures::Async::*;
+    use matches::assert_matches;
+
+    use crate::stream_parser::*;
+    use crate::tests::ENCODE_WEBM_TEST_FILE;
+    use crate::webm::*;
+
+    #[test]
+    fn stream_webm_test() {
+        let pieces = vec![
+            &ENCODE_WEBM_TEST_FILE[0..20],
+            &ENCODE_WEBM_TEST_FILE[20..40],
+            &ENCODE_WEBM_TEST_FILE[40..],
+        ];
+
+        let mut stream_parser = futures::stream::iter_ok(pieces.iter())
+            .map(|bytes| bytes.into_buf())
+            .parse_ebml();
+
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::EbmlHead)))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Segment)))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Tracks(_))))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Cluster)))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Timecode(0))))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::SimpleBlock(_))))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Cluster)))
+        );
+        assert_matches!(
+            stream_parser.poll_event(),
+            Ok(Ready(Some(WebmElement::Timecode(1000))))
+        );
+    }
 }
