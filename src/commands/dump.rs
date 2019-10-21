@@ -1,7 +1,5 @@
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use futures::Async;
-use futures3::future::{FutureExt, poll_fn};
-use std::task::Poll;
+use tokio2::runtime::Runtime;
 
 use super::stdin_stream;
 use webmetro::{
@@ -23,9 +21,8 @@ pub fn run(_args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let mut events = stdin_stream().parse_ebml();
 
-    Ok(poll_fn(|cx| {
-        // stdin is sync so Async::NotReady will never happen on this tokio version
-        while let Ok(Async::Ready(Some(element))) = events.poll_event(cx) {
+    Runtime::new().unwrap().block_on(async {
+        while let Some(element) = events.next().await? {
             match element {
                 // suppress printing byte arrays
                 Tracks(slice) => println!("Tracks[{}]", slice.len()),
@@ -33,7 +30,6 @@ pub fn run(_args: &ArgMatches) -> Result<(), WebmetroError> {
                 other => println!("{:?}", other)
             }
         }
-
-        Poll::Ready(())
-    }).now_or_never().expect("Stdin should never go async"))
+        Ok(())
+    })
 }
