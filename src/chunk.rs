@@ -1,8 +1,11 @@
 use bytes::{Buf, Bytes};
-use futures::{Async, Stream};
+use futures::{Async};
+use futures3::prelude::*;
 use std::{
     io::Cursor,
-    mem
+    mem,
+    pin::Pin,
+    task::{Context, Poll, Poll::*},
 };
 use crate::stream_parser::EbmlStreamingParser;
 use crate::error::WebmetroError;
@@ -128,22 +131,22 @@ fn encode(element: WebmElement, buffer: &mut Cursor<Vec<u8>>, limit: Option<usiz
     encode_webm_element(element, buffer).map_err(|err| err.into())
 }
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<S>
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for WebmChunker<S>
 {
-    type Item = Chunk;
-    type Error = WebmetroError;
+    type Item = Result<Chunk, WebmetroError>;
 
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, WebmetroError> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, WebmetroError>>> {
+        let mut chunker = self.get_mut();
         loop {
             let mut return_value = None;
             let mut new_state = None;
 
-            match self.state {
+            match chunker.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
-                    match self.source.poll_event() {
-                        Err(passthru) => return Err(passthru.into()),
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
+                    match chunker.source.poll_event(cx) {
+                        Err(passthru) => return Ready(Some(Err(passthru))),
+                        Ok(Async::NotReady) => return Pending,
+                        Ok(Async::Ready(None)) => return Ready(None),
                         Ok(Async::Ready(Some(WebmElement::Cluster))) => {
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
                             let header_chunk = Chunk::Headers {bytes: Bytes::from(liberated_buffer.into_inner())};
@@ -158,7 +161,7 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<
                         Ok(Async::Ready(Some(WebmElement::Void))) => {},
                         Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
                         Ok(Async::Ready(Some(element))) => {
-                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                            encode(element, buffer, chunker.buffer_size_limit).unwrap_or_else(|err| {
                                 return_value = Some(Err(err));
                                 new_state = Some(ChunkerState::End);
                             });
@@ -166,16 +169,16 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<
                     }
                 },
                 ChunkerState::BuildingCluster(ref mut cluster_head, ref mut buffer) => {
-                    match self.source.poll_event() {
-                        Err(passthru) => return Err(passthru.into()),
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    match chunker.source.poll_event(cx) {
+                        Err(passthru) => return Ready(Some(Err(passthru))),
+                        Ok(Async::NotReady) => return Pending,
                         Ok(Async::Ready(Some(element @ WebmElement::EbmlHead)))
                         | Ok(Async::Ready(Some(element @ WebmElement::Segment))) => {
                             let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
                             let mut new_header_cursor = Cursor::new(Vec::new());
-                            match encode(element, &mut new_header_cursor, self.buffer_size_limit) {
+                            match encode(element, &mut new_header_cursor, chunker.buffer_size_limit) {
                                 Ok(_) => {
                                     return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterHead(liberated_cluster_head)))));
                                     new_state = Some(ChunkerState::EmittingClusterBodyBeforeNewHeader{
@@ -205,7 +208,7 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<
                                 cluster_head.keyframe = true;
                             }
                             cluster_head.observe_simpleblock_timecode(block.timecode);
-                            encode(WebmElement::SimpleBlock(*block), buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                            encode(WebmElement::SimpleBlock(*block), buffer, chunker.buffer_size_limit).unwrap_or_else(|err| {
                                 return_value = Some(Err(err));
                                 new_state = Some(ChunkerState::End);
                             });
@@ -214,7 +217,7 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<
                         Ok(Async::Ready(Some(WebmElement::Void))) => {},
                         Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
                         Ok(Async::Ready(Some(element))) => {
-                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
+                            encode(element, buffer, chunker.buffer_size_limit).unwrap_or_else(|err| {
                                 return_value = Some(Err(err));
                                 new_state = Some(ChunkerState::End);
                             });
@@ -252,14 +255,19 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<
                     return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer)}))));
                     new_state = Some(ChunkerState::End);
                 },
-                ChunkerState::End => return Ok(Async::Ready(None))
+                ChunkerState::End => return Ready(None)
             };
 
             if let Some(new_state) = new_state {
-                self.state = new_state;
+                chunker.state = new_state;
             }
             if let Some(return_value) = return_value {
-                return return_value;
+                return match return_value {
+                    Ok(Async::Ready(Some(chunk))) => Ready(Some(Ok(chunk))),
+                    Ok(Async::Ready(None)) => Ready(None),
+                    Ok(Async::NotReady) => Pending,
+                    Err(err) => Ready(Some(Err(err))),
+                };
             }
         }
     }

@@ -1,5 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures::{stream::Stream, Async};
+use futures::Async;
+use futures3::stream::{Stream, StreamExt, TryStream};
+use std::task::{Context, Poll};
 
 use crate::ebml::FromEbml;
 use crate::error::WebmetroError;
@@ -21,10 +23,10 @@ impl<S> EbmlStreamingParser<S> {
     }
 }
 
-pub trait StreamEbml
+pub trait StreamEbml: Sized + TryStream + Unpin
 where
-    Self: Sized + Stream,
-    Self::Item: Buf,
+    Self: Sized + TryStream + Unpin,
+    Self::Ok: Buf,
 {
     fn parse_ebml(self) -> EbmlStreamingParser<Self> {
         EbmlStreamingParser {
@@ -36,11 +38,12 @@ where
     }
 }
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> StreamEbml for S {}
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> StreamEbml for S {}
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> {
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingParser<S> {
     pub fn poll_event<'a, T: FromEbml<'a>>(
         &'a mut self,
+        cx: &mut Context,
     ) -> Result<Async<Option<T>>, WebmetroError> {
         loop {
             match T::check_space(&self.buffer)? {
@@ -64,13 +67,14 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> 
                 }
             }
 
-            match self.stream.poll()? {
-                Async::Ready(Some(buf)) => {
+            match self.stream.poll_next_unpin(cx)? {
+                Poll::Ready(Some(buf)) => {
                     self.buffer.reserve(buf.remaining());
                     self.buffer.put(buf);
                     // ok can retry decoding now
                 }
-                other => return Ok(other.map(|_| None)),
+                Poll::Ready(None) => return Ok(Async::Ready(None)),
+                Poll::Pending => return Ok(Async::NotReady),
             }
         }
     }
@@ -79,8 +83,12 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> 
 #[cfg(test)]
 mod tests {
     use bytes::IntoBuf;
-    use futures::prelude::*;
     use futures::Async::*;
+    use futures3::{
+        future::poll_fn,
+        stream::StreamExt,
+        FutureExt,
+    };
     use matches::assert_matches;
 
     use crate::stream_parser::*;
@@ -89,47 +97,53 @@ mod tests {
 
     #[test]
     fn stream_webm_test() {
-        let pieces = vec![
-            &ENCODE_WEBM_TEST_FILE[0..20],
-            &ENCODE_WEBM_TEST_FILE[20..40],
-            &ENCODE_WEBM_TEST_FILE[40..],
-        ];
+        poll_fn(|cx| {
+            let pieces = vec![
+                &ENCODE_WEBM_TEST_FILE[0..20],
+                &ENCODE_WEBM_TEST_FILE[20..40],
+                &ENCODE_WEBM_TEST_FILE[40..],
+            ];
 
-        let mut stream_parser = futures::stream::iter_ok(pieces.iter())
-            .map(|bytes| bytes.into_buf())
-            .parse_ebml();
+            let mut stream_parser = futures3::stream::iter(pieces.iter())
+                .map(|bytes| Ok(bytes.into_buf()))
+                .parse_ebml();
 
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::EbmlHead)))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Segment)))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Tracks(_))))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Cluster)))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Timecode(0))))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::SimpleBlock(_))))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Cluster)))
-        );
-        assert_matches!(
-            stream_parser.poll_event(),
-            Ok(Ready(Some(WebmElement::Timecode(1000))))
-        );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::EbmlHead)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Segment)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Tracks(_))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Cluster)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Timecode(0))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::SimpleBlock(_))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Cluster)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ok(Ready(Some(WebmElement::Timecode(1000))))
+            );
+
+            std::task::Poll::Ready(())
+        })
+        .now_or_never()
+        .expect("Test succeeded without blocking");
     }
 }

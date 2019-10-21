@@ -2,9 +2,9 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
     prelude::*
 };
+use futures3::prelude::*;
 use futures3::compat::{
     Compat,
-    Compat01As03
 };
 use hyper::{
     Body,
@@ -24,8 +24,8 @@ use webmetro::{
     },
     error::WebmetroError,
     fixers::{
-        ChunkStream,
         ChunkTimecodeFixer,
+        Throttle,
     },
     stream_parser::StreamEbml
 };
@@ -41,7 +41,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down upload to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-type BoxedChunkStream = Box<dyn Stream<Item = Chunk, Error = WebmetroError> + Send>;
+type BoxedChunkStream = Box<dyn TryStream<Item = Result<Chunk, WebmetroError>, Ok = Chunk, Error = WebmetroError> + Send + Unpin>;
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
@@ -49,7 +49,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         stdin_stream()
         .parse_ebml()
         .chunk_webm()
-        .map(move |chunk| timecode_fixer.process(chunk))
+        .map_ok(move |chunk| timecode_fixer.process(chunk))
     );
 
     let url_str = match args.value_of("url") {
@@ -58,15 +58,15 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     };
 
     if args.is_present("throttle") {
-        chunk_stream = Box::new(Compat::new(Compat01As03::new(chunk_stream).throttle()));
+        chunk_stream = Box::new(Throttle::new(chunk_stream));
     }
 
-    let request_payload = Body::wrap_stream(chunk_stream.map(
+    let request_payload = Body::wrap_stream(Compat::new(chunk_stream.map_ok(
         |webm_chunk| webm_chunk.into_bytes()
     ).map_err(|err| {
         eprintln!("{}", &err);
         err
-    }));
+    })));
 
     
     let request = Request::put(url_str)

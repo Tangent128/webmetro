@@ -1,5 +1,7 @@
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use futures::prelude::*;
+use futures::Async;
+use futures3::future::{FutureExt, poll_fn};
+use std::task::Poll;
 
 use super::stdin_stream;
 use webmetro::{
@@ -21,15 +23,17 @@ pub fn run(_args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let mut events = stdin_stream().parse_ebml();
 
-    // stdin is sync so Async::NotReady will never happen
-    while let Ok(Async::Ready(Some(element))) = events.poll_event() {
-        match element {
-            // suppress printing byte arrays
-            Tracks(slice) => println!("Tracks[{}]", slice.len()),
-            SimpleBlock(SimpleBlock {timecode, ..}) => println!("SimpleBlock@{}", timecode),
-            other => println!("{:?}", other)
+    Ok(poll_fn(|cx| {
+        // stdin is sync so Async::NotReady will never happen on this tokio version
+        while let Ok(Async::Ready(Some(element))) = events.poll_event(cx) {
+            match element {
+                // suppress printing byte arrays
+                Tracks(slice) => println!("Tracks[{}]", slice.len()),
+                SimpleBlock(SimpleBlock {timecode, ..}) => println!("SimpleBlock@{}", timecode),
+                other => println!("{:?}", other)
+            }
         }
-    }
 
-    Ok(())
+        Poll::Ready(())
+    }).now_or_never().expect("Stdin should never go async"))
 }
