@@ -2,7 +2,6 @@
 pub mod ebml;
 pub mod error;
 
-pub mod async_parser;
 pub mod iterator;
 pub mod stream_parser;
 
