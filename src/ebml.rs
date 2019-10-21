@@ -1,7 +1,6 @@
 use bytes::{BigEndian, ByteOrder, BufMut};
 use custom_error::custom_error;
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
-use futures::Async;
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
@@ -259,11 +258,6 @@ pub trait FromEbml<'a>: Sized {
             }
         }
     }
-}
-
-pub trait EbmlEventSource {
-    type Error;
-    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, Self::Error>;
 }
 
 #[cfg(test)]

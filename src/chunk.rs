@@ -1,10 +1,10 @@
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::{Async, Stream};
 use std::{
     io::Cursor,
     mem
 };
-use crate::ebml::EbmlEventSource;
+use crate::stream_parser::EbmlStreamingParser;
 use crate::error::WebmetroError;
 use crate::webm::*;
 
@@ -103,7 +103,7 @@ enum ChunkerState {
 }
 
 pub struct WebmChunker<S> {
-    source: S,
+    source: EbmlStreamingParser<S>,
     buffer_size_limit: Option<usize>,
     state: ChunkerState
 }
@@ -128,8 +128,7 @@ fn encode(element: WebmElement, buffer: &mut Cursor<Vec<u8>>, limit: Option<usiz
     encode_webm_element(element, buffer).map_err(|err| err.into())
 }
 
-impl<S: EbmlEventSource> Stream for WebmChunker<S>
-where S::Error: Into<WebmetroError>
+impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> Stream for WebmChunker<S>
 {
     type Item = Chunk;
     type Error = WebmetroError;
@@ -266,8 +265,14 @@ where S::Error: Into<WebmetroError>
     }
 }
 
-pub trait WebmStream where Self: Sized + EbmlEventSource {
-    fn chunk_webm(self) -> WebmChunker<Self> {
+pub trait WebmStream {
+    type Stream;
+    fn chunk_webm(self) -> WebmChunker<Self::Stream>;
+}
+
+impl<S: Stream> WebmStream for EbmlStreamingParser<S> {
+    type Stream = S;
+    fn chunk_webm(self) -> WebmChunker<S> {
         WebmChunker {
             source: self,
             buffer_size_limit: None,
@@ -275,8 +280,6 @@ pub trait WebmStream where Self: Sized + EbmlEventSource {
         }
     }
 }
-
-impl<T: EbmlEventSource> WebmStream for T {}
 
 #[cfg(test)]
 mod tests {

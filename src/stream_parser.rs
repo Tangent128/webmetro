@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::{stream::Stream, Async};
 
-use crate::ebml::{EbmlEventSource, FromEbml};
+use crate::ebml::FromEbml;
 use crate::error::WebmetroError;
 
 pub struct EbmlStreamingParser<S> {
@@ -73,16 +73,6 @@ impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> 
                 other => return Ok(other.map(|_| None)),
             }
         }
-    }
-}
-
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlEventSource
-    for EbmlStreamingParser<S>
-{
-    type Error = WebmetroError;
-
-    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, WebmetroError> {
-        return EbmlStreamingParser::poll_event(self);
     }
 }
 
