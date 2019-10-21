@@ -91,16 +91,9 @@ impl Sink<Chunk> for Transmitter {
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Never>> {
-        let mut channel = self.channel.lock().expect("Locking channel");
-
-        // there's no useful error we can offer here, just give everything a chance to try closing
-        channel.listeners.retain_mut(|listener| Pin::new(listener).poll_close(cx).is_pending());
-
-        return if channel.listeners.len() > 0 {
-            Poll::Pending
-        } else {
-            Poll::Ready(Ok(()))
-        }
+        // don't actually disconnect listeners, since other sources may want to transmit to this channel;
+        // just ensure we've sent everything we can out
+        self.poll_flush(cx)
     }
 }
 
