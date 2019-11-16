@@ -15,9 +15,6 @@ hyper = "0.12.35"
 hyper13 = { package = "hyper", version="0.13.0-alpha.4", features = ["unstable-stream"] }
 matches = "0.1.8"
 odds = { version = "0.3.1", features = ["std-vec"] }
-tokio = "0.1.22"
 tokio2 = { package = "tokio", version="0.2.0-alpha.6" }
-tokio-codec = "0.1.1"
-tokio-io = "0.1.12"
 warp = "0.1.20"
 weak-table = "0.2.3"

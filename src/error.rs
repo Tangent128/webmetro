@@ -8,7 +8,6 @@ custom_error!{pub WebmetroError
     HyperError{source: hyper::Error} = "Hyper error: {source}",
     Hyper13Error{source: hyper13::Error} = "Hyper error: {source}",
     IoError{source: std::io::Error} = "IO error: {source}",
-    TimerError{source: tokio::timer::Error} = "Timer error: {source}",
     WarpError{source: warp::Error} = "Warp error: {source}",
     ApplicationError{message: String} = "{message}"
 }
