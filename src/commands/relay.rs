@@ -21,7 +21,6 @@ use futures3::{
     },
     Never,
     prelude::*,
-    StreamExt
 };
 use hyper::{
     Body,
