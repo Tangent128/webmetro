@@ -1,5 +1,4 @@
 use bytes::{Buf, Bytes};
-use futures::{Async};
 use futures3::prelude::*;
 use std::{
     io::Cursor,
@@ -141,10 +140,10 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for Webm
             match chunker.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
                     match chunker.source.poll_event(cx) {
-                        Err(passthru) => return Ready(Some(Err(passthru))),
-                        Ok(Async::NotReady) => return Pending,
-                        Ok(Async::Ready(None)) => return Ready(None),
-                        Ok(Async::Ready(Some(element))) => match element {
+                        Ready(Some(Err(passthru))) => return Ready(Some(Err(passthru))),
+                        Pending => return Pending,
+                        Ready(None) => return Ready(None),
+                        Ready(Some(Ok(element))) => match element {
                             WebmElement::Cluster => {
                                 let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
                                 let header_chunk = Chunk::Headers {bytes: Bytes::from(liberated_buffer.into_inner())};
@@ -169,9 +168,9 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for Webm
                 },
                 ChunkerState::BuildingCluster(ref mut cluster_head, ref mut buffer) => {
                     match chunker.source.poll_event(cx) {
-                        Err(passthru) => return Ready(Some(Err(passthru))),
-                        Ok(Async::NotReady) => return Pending,
-                        Ok(Async::Ready(Some(element))) => match element {
+                        Ready(Some(Err(passthru))) => return Ready(Some(Err(passthru))),
+                        Pending => return Pending,
+                        Ready(Some(Ok(element))) => match element {
                             WebmElement::EbmlHead | WebmElement::Segment => {
                                 let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                                 let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
@@ -222,7 +221,7 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for Webm
                                 }
                             },
                         },
-                        Ok(Async::Ready(None)) => {
+                        Ready(None) => {
                             // flush final Cluster on end of stream
                             let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
