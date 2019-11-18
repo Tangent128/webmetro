@@ -1,7 +1,6 @@
 use bytes::{BigEndian, ByteOrder, BufMut};
 use custom_error::custom_error;
 use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
-use futures::Async;
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
@@ -197,6 +196,12 @@ pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResul
     output.write_all(&buffer.get_ref()[..])
 }
 
+pub struct EbmlLayout {
+    pub element_id: u64,
+    pub body_offset: usize,
+    pub element_len: usize,
+}
+
 pub trait FromEbml<'a>: Sized {
     /// Indicates if this tag's contents should be treated as a blob,
     /// or if the tag header should be reported as an event and with further
@@ -210,13 +215,14 @@ pub trait FromEbml<'a>: Sized {
     /// references into the given buffer.
     fn decode(element_id: u64, bytes: &'a[u8]) -> Result<Self, EbmlError>;
 
-    /// Check if enough space exists in the given buffer for decode_element() to
-    /// be successful; parsing errors will be returned eagerly.
-    fn check_space(bytes: &[u8]) -> Result<Option<usize>, EbmlError> {
+    /// Check if enough space exists in the given buffer to decode an element;
+    /// it will not actually call `decode` or try to construct an instance,
+    /// but EBML errors with the next tag header will be returned eagerly.
+    fn check_space(bytes: &[u8]) -> Result<Option<EbmlLayout>, EbmlError> {
         match decode_tag(bytes) {
             Ok(None) => Ok(None),
             Err(err) => Err(err),
-            Ok(Some((element_id, payload_size_tag, tag_size))) => {
+            Ok(Some((element_id, payload_size_tag, body_offset))) => {
                 let should_unwrap = Self::should_unwrap(element_id);
 
                 let payload_size = match (should_unwrap, payload_size_tag) {
@@ -225,12 +231,16 @@ pub trait FromEbml<'a>: Sized {
                     (false, Varint::Value(size)) => size as usize
                 };
 
-                let element_size = tag_size + payload_size;
-                if element_size > bytes.len() {
+                let element_len = body_offset + payload_size;
+                if element_len > bytes.len() {
                     // need to read more still
                     Ok(None)
                 } else {
-                    Ok(Some(element_size))
+                    Ok(Some(EbmlLayout {
+                        element_id,
+                        body_offset,
+                        element_len
+                    }))
                 }
             }
         }
@@ -238,36 +248,16 @@ pub trait FromEbml<'a>: Sized {
 
     /// Attempt to construct an instance of this type from the given byte slice
     fn decode_element(bytes: &'a[u8]) -> Result<Option<(Self, usize)>, EbmlError> {
-        match decode_tag(bytes) {
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-            Ok(Some((element_id, payload_size_tag, tag_size))) => {
-                let should_unwrap = Self::should_unwrap(element_id);
-
-                let payload_size = match (should_unwrap, payload_size_tag) {
-                    (true, _) => 0,
-                    (false, Varint::Unknown) => return Err(EbmlError::UnknownElementLength),
-                    (false, Varint::Value(size)) => size as usize
-                };
-
-                let element_size = tag_size + payload_size;
-                if element_size > bytes.len() {
-                    // need to read more still
-                    return Ok(None);
-                }
-
-                match Self::decode(element_id, &bytes[tag_size..element_size]) {
-                    Ok(element) => Ok(Some((element, element_size))),
+        match Self::check_space(bytes)? {
+            None => Ok(None),
+            Some(info) => {
+                match Self::decode(info.element_id, &bytes[info.body_offset..info.element_len]) {
+                    Ok(element) => Ok(Some((element, info.element_len))),
                     Err(error) => Err(error)
                 }
             }
         }
     }
-}
-
-pub trait EbmlEventSource {
-    type Error;
-    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, Self::Error>;
 }
 
 #[cfg(test)]

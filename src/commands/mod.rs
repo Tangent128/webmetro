@@ -1,15 +1,7 @@
-use std::io::stdin;
+use std::io::Cursor;
 
-use bytes::{
-    Buf,
-    IntoBuf
-};
-use futures::prelude::*;
-use tokio_io::io::AllowStdIo;
-use tokio_codec::{
-    BytesCodec,
-    FramedRead
-};
+use bytes::Bytes;
+use futures3::TryStreamExt;
 use webmetro::error::WebmetroError;
 
 pub mod dump;
@@ -20,8 +12,13 @@ pub mod send;
 /// An adapter that makes chunks of bytes from stdin available as a Stream;
 /// is NOT actually async, and just uses blocking read. Don't use more than
 /// one at once, who knows who gets which bytes.
-pub fn stdin_stream() -> impl Stream<Item = impl Buf, Error = WebmetroError> {
-    FramedRead::new(AllowStdIo::new(stdin()), BytesCodec::new())
-    .map(|bytes| bytes.into_buf())
-    .map_err(WebmetroError::from)
+pub fn stdin_stream() -> impl futures3::TryStream<
+    Item = Result<Cursor<Bytes>, WebmetroError>,
+    Ok = Cursor<Bytes>,
+    Error = WebmetroError,
+> + Sized
+       + Unpin {
+    tokio2::codec::FramedRead::new(tokio2::io::stdin(), tokio2::codec::BytesCodec::new())
+        .map_ok(|bytes| Cursor::new(bytes.freeze()))
+        .map_err(WebmetroError::from)
 }

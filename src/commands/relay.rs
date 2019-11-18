@@ -13,6 +13,15 @@ use futures::{
     Sink,
     stream::empty
 };
+use futures3::{
+    compat::{
+        Compat,
+        CompatSink,
+        Compat01As03,
+    },
+    Never,
+    prelude::*,
+};
 use hyper::{
     Body,
     Response,
@@ -38,28 +47,32 @@ use webmetro::{
     },
     chunk::WebmStream,
     error::WebmetroError,
-    fixers::ChunkStream,
+    fixers::{
+        ChunkStream,
+        ChunkTimecodeFixer,
+    },
     stream_parser::StreamEbml
 };
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
 fn get_stream(channel: Handle) -> impl Stream<Item = Bytes, Error = WebmetroError> {
-    Listener::new(channel)
-    .fix_timecodes()
+    let mut timecode_fixer = ChunkTimecodeFixer::new();
+    Compat::new(Listener::new(channel).map(|c| Ok(c))
+    .map_ok(move |chunk| timecode_fixer.process(chunk))
     .find_starting_point()
-    .map(|webm_chunk| webm_chunk.into_bytes())
-    .map_err(|err| match err {})
+    .map_ok(|webm_chunk| webm_chunk.into_bytes())
+    .map_err(|err: Never| match err {}))
 }
 
 fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = warp::Error>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
-    let source = stream
-        .map_err(WebmetroError::from)
+    let source = Compat01As03::new(stream
+        .map_err(WebmetroError::from))
         .parse_ebml().with_soft_limit(BUFFER_LIMIT)
         .chunk_webm().with_soft_limit(BUFFER_LIMIT);
-    let sink = Transmitter::new(channel);
+    let sink = CompatSink::new(Transmitter::new(channel));
 
-    source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
+    Compat::new(source).forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
     .into_stream()
     .map(|_| empty())
     .map_err(|err| {

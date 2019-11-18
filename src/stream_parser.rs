@@ -1,24 +1,15 @@
-use bytes::{
-    Buf,
-    BufMut,
-    BytesMut
-};
-use futures::{
-    Async,
-    stream::Stream
-};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use futures3::stream::{Stream, StreamExt, TryStream};
+use std::task::{Context, Poll};
 
-use crate::ebml::{
-    EbmlEventSource,
-    FromEbml
-};
+use crate::ebml::FromEbml;
 use crate::error::WebmetroError;
 
 pub struct EbmlStreamingParser<S> {
     stream: S,
     buffer: BytesMut,
     buffer_size_limit: Option<usize>,
-    last_read: usize
+    borrowed: Bytes,
 }
 
 impl<S> EbmlStreamingParser<S> {
@@ -31,70 +22,183 @@ impl<S> EbmlStreamingParser<S> {
     }
 }
 
-pub trait StreamEbml where Self: Sized + Stream, Self::Item: Buf {
+pub trait StreamEbml: Sized + TryStream + Unpin
+where
+    Self: Sized + TryStream + Unpin,
+    Self::Ok: Buf,
+{
     fn parse_ebml(self) -> EbmlStreamingParser<Self> {
         EbmlStreamingParser {
             stream: self,
             buffer: BytesMut::new(),
             buffer_size_limit: None,
-            last_read: 0
+            borrowed: Bytes::new(),
         }
     }
 }
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> StreamEbml for S {}
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> StreamEbml for S {}
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlStreamingParser<S> {
-    pub fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, WebmetroError> {
-        // release buffer from previous event
-        self.buffer.advance(self.last_read);
-        self.last_read = 0;
-
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingParser<S> {
+    pub fn poll_event<'a, T: FromEbml<'a>>(
+        &'a mut self,
+        cx: &mut Context,
+    ) -> Poll<Option<Result<T, WebmetroError>>> {
         loop {
-            match T::check_space(&self.buffer) {
-                Ok(None) => {
+            match T::check_space(&self.buffer)? {
+                None => {
                     // need to refill buffer, below
-                },
-                other => return other.map_err(WebmetroError::from).and_then(move |_| {
-                    match T::decode_element(&self.buffer) {
-                        Err(err) => Err(err.into()),
-                        Ok(None) => panic!("Buffer was supposed to have enough data to parse element, somehow did not."),
-                        Ok(Some((element, element_size))) => {
-                            self.last_read = element_size;
-                            Ok(Async::Ready(Some(element)))
-                        }
-                    }
-                })
+                }
+                Some(info) => {
+                    let mut bytes = self.buffer.split_to(info.element_len).freeze();
+                    bytes.advance(info.body_offset);
+                    self.borrowed = bytes;
+                    return Poll::Ready(Some(T::decode(
+                        info.element_id,
+                        &self.borrowed,
+                    ).map_err(Into::into)));
+                }
             }
 
             if let Some(limit) = self.buffer_size_limit {
                 if limit <= self.buffer.len() {
-                    return Err(WebmetroError::ResourcesExceeded);
+                    return Poll::Ready(Some(Err(WebmetroError::ResourcesExceeded)));
                 }
             }
 
-            match self.stream.poll() {
-                Ok(Async::Ready(Some(buf))) => {
+            match self.stream.poll_next_unpin(cx)? {
+                Poll::Ready(Some(buf)) => {
                     self.buffer.reserve(buf.remaining());
                     self.buffer.put(buf);
                     // ok can retry decoding now
-                },
-                other => return other.map(|async_status| async_status.map(|_| None))
+                }
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Pending => return Poll::Pending,
             }
         }
     }
 }
 
-impl<I: Buf, S: Stream<Item = I, Error = WebmetroError>> EbmlEventSource for EbmlStreamingParser<S> {
-    type Error = WebmetroError;
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingParser<S> {
+    pub async fn next<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Option<T>, WebmetroError> {
+        loop {
+            if let Some(info) = T::check_space(&self.buffer)? {
+                let mut bytes = self.buffer.split_to(info.element_len).freeze();
+                bytes.advance(info.body_offset);
+                self.borrowed = bytes;
+                return Ok(Some(T::decode(info.element_id, &self.borrowed)?));
+            }
 
-    fn poll_event<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Async<Option<T>>, WebmetroError> {
-        return EbmlStreamingParser::poll_event(self);
+            if let Some(limit) = self.buffer_size_limit {
+                if limit <= self.buffer.len() {
+                    // hit our buffer limit and still nothing parsed
+                    return Err(WebmetroError::ResourcesExceeded);
+                }
+            }
+
+            match self.stream.next().await.transpose()? {
+                Some(refill) => {
+                    self.buffer.reserve(refill.remaining());
+                    self.buffer.put(refill);
+                }
+                None => {
+                    // Nothing left, we're done
+                    return Ok(None);
+                }
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    //#[test]
-    
+    use bytes::IntoBuf;
+    use futures3::{future::poll_fn, stream::StreamExt, FutureExt};
+    use matches::assert_matches;
+    use std::task::Poll::*;
+
+    use crate::stream_parser::*;
+    use crate::tests::ENCODE_WEBM_TEST_FILE;
+    use crate::webm::*;
+
+    #[test]
+    fn stream_webm_test() {
+        poll_fn(|cx| {
+            let pieces = vec![
+                &ENCODE_WEBM_TEST_FILE[0..20],
+                &ENCODE_WEBM_TEST_FILE[20..40],
+                &ENCODE_WEBM_TEST_FILE[40..],
+            ];
+
+            let mut stream_parser = futures3::stream::iter(pieces.iter())
+                .map(|bytes| Ok(bytes.into_buf()))
+                .parse_ebml();
+
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::EbmlHead)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Segment)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Tracks(_))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Cluster)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Timecode(0))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::SimpleBlock(_))))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Cluster)))
+            );
+            assert_matches!(
+                stream_parser.poll_event(cx),
+                Ready(Some(Ok(WebmElement::Timecode(1000))))
+            );
+
+            std::task::Poll::Ready(())
+        })
+        .now_or_never()
+        .expect("Test tried to block on I/O");
+    }
+
+    #[test]
+    fn async_webm_test() {
+        let pieces = vec![
+            &ENCODE_WEBM_TEST_FILE[0..20],
+            &ENCODE_WEBM_TEST_FILE[20..40],
+            &ENCODE_WEBM_TEST_FILE[40..],
+        ];
+
+        async {
+            let mut parser = futures3::stream::iter(pieces.iter())
+                .map(|bytes| Ok(bytes.into_buf()))
+                .parse_ebml();
+
+            assert_matches!(parser.next().await?, Some(WebmElement::EbmlHead));
+            assert_matches!(parser.next().await?, Some(WebmElement::Segment));
+            assert_matches!(parser.next().await?, Some(WebmElement::Tracks(_)));
+            assert_matches!(parser.next().await?, Some(WebmElement::Cluster));
+            assert_matches!(parser.next().await?, Some(WebmElement::Timecode(0)));
+            assert_matches!(parser.next().await?, Some(WebmElement::SimpleBlock(_)));
+            assert_matches!(parser.next().await?, Some(WebmElement::Cluster));
+            assert_matches!(parser.next().await?, Some(WebmElement::Timecode(1000)));
+
+            Result::<(), WebmetroError>::Ok(())
+        }
+        .now_or_never()
+        .expect("Test tried to block on I/O")
+        .expect("Parse failed");
+    }
 }

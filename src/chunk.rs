@@ -1,10 +1,12 @@
-use bytes::Bytes;
-use futures::{Async, Stream};
+use bytes::{Buf, Bytes};
+use futures3::prelude::*;
 use std::{
     io::Cursor,
-    mem
+    mem,
+    pin::Pin,
+    task::{Context, Poll, Poll::*},
 };
-use crate::ebml::EbmlEventSource;
+use crate::stream_parser::EbmlStreamingParser;
 use crate::error::WebmetroError;
 use crate::webm::*;
 
@@ -103,7 +105,7 @@ enum ChunkerState {
 }
 
 pub struct WebmChunker<S> {
-    source: S,
+    source: EbmlStreamingParser<S>,
     buffer_size_limit: Option<usize>,
     state: ChunkerState
 }
@@ -128,146 +130,144 @@ fn encode(element: WebmElement, buffer: &mut Cursor<Vec<u8>>, limit: Option<usiz
     encode_webm_element(element, buffer).map_err(|err| err.into())
 }
 
-impl<S: EbmlEventSource> Stream for WebmChunker<S>
-where S::Error: Into<WebmetroError>
+impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for WebmChunker<S>
 {
-    type Item = Chunk;
-    type Error = WebmetroError;
+    type Item = Result<Chunk, WebmetroError>;
 
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, WebmetroError> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, WebmetroError>>> {
+        let mut chunker = self.get_mut();
         loop {
-            let mut return_value = None;
-            let mut new_state = None;
-
-            match self.state {
+            match chunker.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
-                    match self.source.poll_event() {
-                        Err(passthru) => return Err(passthru.into()),
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
-                        Ok(Async::Ready(Some(WebmElement::Cluster))) => {
-                            let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
-                            let header_chunk = Chunk::Headers {bytes: Bytes::from(liberated_buffer.into_inner())};
+                    match chunker.source.poll_event(cx) {
+                        Ready(Some(Err(passthru))) => return Ready(Some(Err(passthru))),
+                        Pending => return Pending,
+                        Ready(None) => return Ready(None),
+                        Ready(Some(Ok(element))) => match element {
+                            WebmElement::Cluster => {
+                                let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
+                                let header_chunk = Chunk::Headers {bytes: Bytes::from(liberated_buffer.into_inner())};
 
-                            return_value = Some(Ok(Async::Ready(Some(header_chunk))));
-                            new_state = Some(ChunkerState::BuildingCluster(
-                                ClusterHead::new(0),
-                                Cursor::new(Vec::new())
-                            ));
-                        },
-                        Ok(Async::Ready(Some(WebmElement::Info))) => {},
-                        Ok(Async::Ready(Some(WebmElement::Void))) => {},
-                        Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
-                        Ok(Async::Ready(Some(element))) => {
-                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
-                                return_value = Some(Err(err));
-                                new_state = Some(ChunkerState::End);
-                            });
+                                chunker.state = ChunkerState::BuildingCluster(
+                                    ClusterHead::new(0),
+                                    Cursor::new(Vec::new())
+                                );
+                                return Ready(Some(Ok(header_chunk)));
+                            },
+                            WebmElement::Info => {},
+                            WebmElement::Void => {},
+                            WebmElement::Unknown(_) => {},
+                            element => {
+                                if let Err(err) = encode(element, buffer, chunker.buffer_size_limit) {
+                                    chunker.state = ChunkerState::End;
+                                    return Ready(Some(Err(err)));
+                                }
+                            }
                         }
                     }
                 },
                 ChunkerState::BuildingCluster(ref mut cluster_head, ref mut buffer) => {
-                    match self.source.poll_event() {
-                        Err(passthru) => return Err(passthru.into()),
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Ok(Async::Ready(Some(element @ WebmElement::EbmlHead)))
-                        | Ok(Async::Ready(Some(element @ WebmElement::Segment))) => {
-                            let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
-                            let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
+                    match chunker.source.poll_event(cx) {
+                        Ready(Some(Err(passthru))) => return Ready(Some(Err(passthru))),
+                        Pending => return Pending,
+                        Ready(Some(Ok(element))) => match element {
+                            WebmElement::EbmlHead | WebmElement::Segment => {
+                                let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
+                                let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
-                            let mut new_header_cursor = Cursor::new(Vec::new());
-                            match encode(element, &mut new_header_cursor, self.buffer_size_limit) {
-                                Ok(_) => {
-                                    return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterHead(liberated_cluster_head)))));
-                                    new_state = Some(ChunkerState::EmittingClusterBodyBeforeNewHeader{
-                                        body: liberated_buffer.into_inner(),
-                                        new_header: new_header_cursor
-                                    });
-                                },
-                                Err(err) => {
-                                    return_value = Some(Err(err));
-                                    new_state = Some(ChunkerState::End);
+                                let mut new_header_cursor = Cursor::new(Vec::new());
+                                match encode(element, &mut new_header_cursor, chunker.buffer_size_limit) {
+                                    Ok(_) => {
+                                        chunker.state = ChunkerState::EmittingClusterBodyBeforeNewHeader{
+                                            body: liberated_buffer.into_inner(),
+                                            new_header: new_header_cursor
+                                        };
+                                        return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
+                                    },
+                                    Err(err) => {
+                                        chunker.state = ChunkerState::End;
+                                        return Ready(Some(Err(err)));
+                                    }
                                 }
-                            }
-                        }
-                        Ok(Async::Ready(Some(WebmElement::Cluster))) => {
-                            let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
-                            let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
+                            },
+                            WebmElement::Cluster => {
+                                let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
+                                let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
-                            return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterHead(liberated_cluster_head)))));
-                            new_state = Some(ChunkerState::EmittingClusterBody(liberated_buffer.into_inner()));
+                                chunker.state = ChunkerState::EmittingClusterBody(liberated_buffer.into_inner());
+                                return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
+                            },
+                            WebmElement::Timecode(timecode) => {
+                                cluster_head.update_timecode(timecode);
+                            },
+                            WebmElement::SimpleBlock(ref block) => {
+                                if (block.flags & 0b10000000) != 0 {
+                                    // TODO: this is incorrect, condition needs to also affirm we're the first video block of the cluster
+                                    cluster_head.keyframe = true;
+                                }
+                                cluster_head.observe_simpleblock_timecode(block.timecode);
+                                if let Err(err) = encode(WebmElement::SimpleBlock(*block), buffer, chunker.buffer_size_limit) {
+                                    chunker.state = ChunkerState::End;
+                                    return Ready(Some(Err(err)));
+                                }
+                            },
+                            WebmElement::Info => {},
+                            WebmElement::Void => {},
+                            WebmElement::Unknown(_) => {},
+                            element => {
+                                if let Err(err) = encode(element, buffer, chunker.buffer_size_limit) {
+                                    chunker.state = ChunkerState::End;
+                                    return Ready(Some(Err(err)));
+                                }
+                            },
                         },
-                        Ok(Async::Ready(Some(WebmElement::Timecode(timecode)))) => {
-                            cluster_head.update_timecode(timecode);
-                        },
-                        Ok(Async::Ready(Some(WebmElement::SimpleBlock(ref block)))) => {
-                            if (block.flags & 0b10000000) != 0 {
-                                // TODO: this is incorrect, condition needs to also affirm we're the first video block of the cluster
-                                cluster_head.keyframe = true;
-                            }
-                            cluster_head.observe_simpleblock_timecode(block.timecode);
-                            encode(WebmElement::SimpleBlock(*block), buffer, self.buffer_size_limit).unwrap_or_else(|err| {
-                                return_value = Some(Err(err));
-                                new_state = Some(ChunkerState::End);
-                            });
-                        },
-                        Ok(Async::Ready(Some(WebmElement::Info))) => {},
-                        Ok(Async::Ready(Some(WebmElement::Void))) => {},
-                        Ok(Async::Ready(Some(WebmElement::Unknown(_)))) => {},
-                        Ok(Async::Ready(Some(element))) => {
-                            encode(element, buffer, self.buffer_size_limit).unwrap_or_else(|err| {
-                                return_value = Some(Err(err));
-                                new_state = Some(ChunkerState::End);
-                            });
-                        },
-                        Ok(Async::Ready(None)) => {
+                        Ready(None) => {
                             // flush final Cluster on end of stream
                             let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
-                            return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterHead(liberated_cluster_head)))));
-                            new_state = Some(ChunkerState::EmittingFinalClusterBody(liberated_buffer.into_inner()));
+                            chunker.state = ChunkerState::EmittingFinalClusterBody(liberated_buffer.into_inner());
+                            return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
                         }
                     }
                 },
                 ChunkerState::EmittingClusterBody(ref mut buffer) => {
                     let liberated_buffer = mem::replace(buffer, Vec::new());
 
-                    return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer)}))));
-                    new_state = Some(ChunkerState::BuildingCluster(
+                    chunker.state = ChunkerState::BuildingCluster(
                         ClusterHead::new(0),
                         Cursor::new(Vec::new())
-                    ));
+                    );
+                    return Ready(Some(Ok(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer)})));
                 },
                 ChunkerState::EmittingClusterBodyBeforeNewHeader { ref mut body, ref mut new_header } => {
                     let liberated_body = mem::replace(body, Vec::new());
                     let liberated_header_cursor = mem::replace(new_header, Cursor::new(Vec::new()));
 
-                    return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_body)}))));
-                    new_state = Some(ChunkerState::BuildingHeader(liberated_header_cursor));
+                    chunker.state = ChunkerState::BuildingHeader(liberated_header_cursor);
+                    return Ready(Some(Ok(Chunk::ClusterBody {bytes: Bytes::from(liberated_body)})));
                 },
                 ChunkerState::EmittingFinalClusterBody(ref mut buffer) => {
                     // flush final Cluster on end of stream
                     let liberated_buffer = mem::replace(buffer, Vec::new());
 
-                    return_value = Some(Ok(Async::Ready(Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer)}))));
-                    new_state = Some(ChunkerState::End);
+                    chunker.state = ChunkerState::End;
+                    return Ready(Some(Ok(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer)})));
                 },
-                ChunkerState::End => return Ok(Async::Ready(None))
+                ChunkerState::End => return Ready(None)
             };
-
-            if let Some(new_state) = new_state {
-                self.state = new_state;
-            }
-            if let Some(return_value) = return_value {
-                return return_value;
-            }
         }
     }
 }
 
-pub trait WebmStream where Self: Sized + EbmlEventSource {
-    fn chunk_webm(self) -> WebmChunker<Self> {
+pub trait WebmStream {
+    type Stream;
+    fn chunk_webm(self) -> WebmChunker<Self::Stream>;
+}
+
+impl<S: Stream> WebmStream for EbmlStreamingParser<S> {
+    type Stream = S;
+    fn chunk_webm(self) -> WebmChunker<S> {
         WebmChunker {
             source: self,
             buffer_size_limit: None,
@@ -275,8 +275,6 @@ pub trait WebmStream where Self: Sized + EbmlEventSource {
         }
     }
 }
-
-impl<T: EbmlEventSource> WebmStream for T {}
 
 #[cfg(test)]
 mod tests {
