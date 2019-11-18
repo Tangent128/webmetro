@@ -101,9 +101,13 @@ pub fn options() -> App<'static, 'static> {
 
 pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let channel_map = Arc::new(Mutex::new(WeakValueHashMap::<String, Weak<Mutex<Channel>>>::new()));
-
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
-    let addr = addr_str.to_socket_addrs()?.next().ok_or("Listen address didn't resolve")?;
+
+    let addrs = addr_str.to_socket_addrs()?;
+    info!("Binding to {:?}", addrs);
+    if addrs.len() == 0 {
+        return Err("Listen address didn't resolve".into());
+    }
 
     let channel = path!("live" / String).map(move |name: String| {
         let channel = channel_map.lock().unwrap()
@@ -134,5 +138,11 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         .or(get)
         .or(post_put);
 
-    Ok(warp::serve(routes).run(addr))
+    let mut rt = tokio::runtime::Runtime::new()?;
+
+    for do_serve in addrs.map(|addr| warp::serve(routes.clone()).try_bind(addr)) {
+        rt.spawn(do_serve);
+    }
+
+    rt.shutdown_on_idle().wait().map_err(|_| "Shutdown error.".into())
 }
