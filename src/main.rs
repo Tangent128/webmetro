@@ -25,6 +25,7 @@ fn options() -> App<'static, 'static> {
 }
 
 fn main() {
+    env_logger::init();
     let args = options().get_matches();
 
     match args.subcommand() {
