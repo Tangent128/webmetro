@@ -76,7 +76,7 @@ fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = war
     .into_stream()
     .map(|_| empty())
     .map_err(|err| {
-        println!("[Warning] {}", err);
+        warn!("{}", err);
         err
     })
     .flatten()
@@ -114,19 +114,19 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let head = channel.clone().and(warp::head())
         .map(|(_, name)| {
-            println!("[Info] HEAD Request For Channel {}", name);
+            info!("HEAD Request For Channel {}", name);
             media_response(Body::empty())
         });
 
     let get = channel.clone().and(warp::get2())
         .map(|(channel, name)| {
-            println!("[Info] Listener Connected On Channel {}", name);
+            info!("Listener Connected On Channel {}", name);
             media_response(Body::wrap_stream(get_stream(channel)))
         });
 
     let post_put = channel.clone().and(warp::post2().or(warp::put2()).unify())
         .and(warp::body::stream()).map(|(channel, name), stream| {
-            println!("[Info] Source Connected On Channel {}", name);
+            info!("Source Connected On Channel {}", name);
             Response::new(Body::wrap_stream(post_stream(channel, stream)))
         });
 

@@ -13,6 +13,7 @@ futures3 = { package = "futures-preview", version="0.3.0-alpha", features = ["co
 http = "^0.1.18"
 hyper = "^0.12.35"
 hyper13 = { package = "hyper", version="0.13.0-alpha.4", features = ["unstable-stream"] }
+log = "^0.4.8"
 matches = "^0.1.8"
 odds = { version = "^0.3.1", features = ["std-vec"] }
 tokio2 = { package = "tokio", version="0.2.0-alpha.6" }

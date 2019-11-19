@@ -1,4 +1,6 @@
 
+#[macro_use] extern crate log;
+
 mod commands;
 
 use clap::{App, AppSettings, crate_version};
@@ -36,6 +38,6 @@ fn main() {
             Ok(())
         }
     }.unwrap_or_else(|err| {
-        eprintln!("Error: {}", err);
+        error!("{}", err);
     });
 }
