@@ -1,6 +1,6 @@
 [package]
 name = "webmetro"
-version = "0.2.2-dev"
+version = "0.2.2"
 authors = ["Tangent 128 <Tangent128@gmail.com>"]
 edition = "2018"
 
