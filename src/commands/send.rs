@@ -51,7 +51,7 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let chunk_stream = chunk_stream
         .map_ok(|webm_chunk| webm_chunk.into_bytes())
         .map_err(|err| {
-            eprintln!("{}", &err);
+            warn!("{}", &err);
             err
         });
 
