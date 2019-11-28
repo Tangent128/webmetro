@@ -52,12 +52,6 @@ impl ClusterHead {
     }
 }
 
-impl AsRef<[u8]> for ClusterHead {
-    fn as_ref(&self) -> &[u8] {
-        self.bytes.as_ref()
-    }
-}
-
 /// A chunk of WebM data
 #[derive(Clone, Debug)]
 pub enum Chunk {
