@@ -1,4 +1,4 @@
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use futures3::prelude::*;
 use std::{
     io::Cursor,
@@ -15,10 +15,9 @@ pub struct ClusterHead {
     pub keyframe: bool,
     pub start: u64,
     pub end: u64,
-    /// space for a Cluster tag and a Timecode tag
-    /// TODO: consider using a BytesMut here for simplicity
-    bytes: [u8;16],
-    bytes_used: u8
+    /// a Cluster tag and a Timecode tag together take at most 15 bytes;
+    /// fortuitously, 15 bytes can be inlined in a Bytes handle even on 32-bit systems
+    bytes: BytesMut,
 }
 
 impl ClusterHead {
@@ -27,8 +26,7 @@ impl ClusterHead {
             keyframe: false,
             start: 0,
             end: 0,
-            bytes: [0;16],
-            bytes_used: 0
+            bytes: BytesMut::with_capacity(15),
         };
         cluster_head.update_timecode(timecode);
         cluster_head
@@ -37,11 +35,14 @@ impl ClusterHead {
         let delta = self.end - self.start;
         self.start = timecode;
         self.end = self.start + delta;
-        let mut cursor = Cursor::new(self.bytes.as_mut());
+        let mut buffer = [0;15];
+        let mut cursor = Cursor::new(buffer.as_mut());
         // buffer is sized so these should never fail
         encode_webm_element(WebmElement::Cluster, &mut cursor).unwrap();
         encode_webm_element(WebmElement::Timecode(timecode), &mut cursor).unwrap();
-        self.bytes_used = cursor.position() as u8;
+        self.bytes.clear();
+        let len = cursor.position() as usize;
+        self.bytes.extend_from_slice(&buffer[..len]);
     }
     pub fn observe_simpleblock_timecode(&mut self, timecode: i16) {
         let absolute_timecode = self.start + (timecode as u64);
@@ -53,7 +54,7 @@ impl ClusterHead {
 
 impl AsRef<[u8]> for ClusterHead {
     fn as_ref(&self) -> &[u8] {
-        self.bytes[..self.bytes_used as usize].as_ref()
+        self.bytes.as_ref()
     }
 }
 
@@ -74,18 +75,8 @@ impl Chunk {
     pub fn into_bytes(self) -> Bytes {
         match self {
             Chunk::Headers {bytes, ..} => bytes,
-            Chunk::ClusterHead(cluster_head) => Bytes::from(cluster_head.as_ref()),
+            Chunk::ClusterHead(cluster_head) => cluster_head.bytes.freeze(),
             Chunk::ClusterBody {bytes, ..} => bytes
-        }
-    }
-}
-
-impl AsRef<[u8]> for Chunk {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            &Chunk::Headers {ref bytes, ..} => bytes.as_ref(),
-            &Chunk::ClusterHead(ref cluster_head) => cluster_head.as_ref(),
-            &Chunk::ClusterBody {ref bytes, ..} => bytes.as_ref()
         }
     }
 }
