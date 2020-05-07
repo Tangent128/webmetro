@@ -1,5 +1,6 @@
-use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
-use bytes::{BigEndian, BufMut, ByteOrder};
+use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, Seek};
+use byteorder::{BigEndian, ByteOrder};
+use bytes::BufMut;
 use crate::ebml::*;
 use crate::iterator::ebml_iter;
 use crate::iterator::EbmlIterator;
@@ -103,11 +104,12 @@ pub fn encode_simple_block<T: Write>(block: SimpleBlock, output: &mut T) -> IoRe
 
     encode_varint(Varint::Value(track), output)?;
 
-    let mut buffer = Cursor::new([0; 3]);
-    buffer.put_i16_be(timecode);
-    buffer.put_u8(flags);
+    let mut buffer = [0; 3];
+    let mut cursor = buffer.as_mut();
+    cursor.put_i16(timecode);
+    cursor.put_u8(flags);
 
-    output.write_all(&buffer.get_ref()[..])?;
+    output.write_all(&buffer)?;
     output.write_all(data)
 }
 
@@ -131,6 +133,7 @@ pub fn encode_webm_element<T: Write + Seek>(element: WebmElement, output: &mut T
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
     use crate::tests::{
         TEST_FILE,
         ENCODE_WEBM_TEST_FILE

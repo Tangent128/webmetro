@@ -112,7 +112,6 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingPa
 
 #[cfg(test)]
 mod tests {
-    use bytes::IntoBuf;
     use futures3::{future::poll_fn, stream::StreamExt, FutureExt};
     use matches::assert_matches;
     use std::task::Poll::*;
@@ -131,7 +130,7 @@ mod tests {
             ];
 
             let mut stream_parser = futures3::stream::iter(pieces.iter())
-                .map(|bytes| Ok(bytes.into_buf()))
+                .map(|bytes| Ok(&bytes[..]))
                 .parse_ebml();
 
             assert_matches!(
@@ -183,7 +182,7 @@ mod tests {
 
         async {
             let mut parser = futures3::stream::iter(pieces.iter())
-                .map(|bytes| Ok(bytes.into_buf()))
+                .map(|bytes| Ok(&bytes[..]))
                 .parse_ebml();
 
             assert_matches!(parser.next().await?, Some(WebmElement::EbmlHead));

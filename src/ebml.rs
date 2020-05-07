@@ -1,6 +1,7 @@
-use bytes::{BigEndian, ByteOrder, BufMut};
+use byteorder::{BigEndian, ByteOrder};
+use bytes::{BufMut};
 use custom_error::custom_error;
-use std::io::{Cursor, Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
+use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write, Seek, SeekFrom};
 
 pub const EBML_HEAD_ID: u64 = 0x0A45DFA3;
 pub const DOC_TYPE_ID: u64 = 0x0282;
@@ -135,10 +136,10 @@ pub fn encode_varint<T: Write>(varint: Varint, output: &mut T) -> IoResult<()> {
         }
     };
 
-    let mut buffer = Cursor::new([0; 8]);
-    buffer.put_uint_be(number, size);
+    let mut buffer = [0; 8];
+    buffer.as_mut().put_uint(number, size);
 
-    return output.write_all(&buffer.get_ref()[..size]);
+    return output.write_all(&buffer[..size]);
 }
 
 const FOUR_FLAG: u64 = 0x10 << (8*3);
@@ -154,10 +155,10 @@ pub fn encode_varint_4<T: Write>(varint: Varint, output: &mut T) -> IoResult<()>
         Varint::Value(value) => FOUR_FLAG | value
     };
 
-    let mut buffer = Cursor::new([0; 4]);
-    buffer.put_u32_be(number as u32);
+    let mut buffer = [0; 4];
+    buffer.as_mut().put_u32(number as u32);
 
-    output.write_all(&buffer.get_ref()[..])
+    output.write_all(&buffer)
 }
 
 pub fn encode_element<T: Write + Seek, F: Fn(&mut T) -> IoResult<X>, X>(tag: u64, output: &mut T, content: F) -> IoResult<()> {
@@ -190,10 +191,10 @@ pub fn encode_bytes<T: Write>(tag: u64, bytes: &[u8], output: &mut T) -> IoResul
 pub fn encode_integer<T: Write>(tag: u64, value: u64, output: &mut T) -> IoResult<()> {
     encode_tag_header(tag, Varint::Value(8), output)?;
 
-    let mut buffer = Cursor::new([0; 8]);
-    buffer.put_u64_be(value);
+    let mut buffer = [0; 8];
+    buffer.as_mut().put_u64(value);
 
-    output.write_all(&buffer.get_ref()[..])
+    output.write_all(&buffer[..])
 }
 
 pub struct EbmlLayout {
@@ -262,11 +263,10 @@ pub trait FromEbml<'a>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{BytesMut};
+    use bytes::{BytesMut, buf::ext::BufMutExt};
     use crate::ebml::*;
     use crate::ebml::EbmlError::{CorruptVarint, UnknownElementId};
     use crate::ebml::Varint::{Unknown, Value};
-    use std::io::Cursor;
     use crate::tests::TEST_FILE;
 
     #[test]
@@ -298,44 +298,48 @@ mod tests {
     fn encode_varints() {
         let mut buffer = BytesMut::with_capacity(10).writer();
 
-        let mut no_space = Cursor::new([0; 0]).writer();
-        assert_eq!(no_space.get_ref().remaining_mut(), 0);
+        let mut no_space = [0; 0];
+        let mut no_space_writer = no_space.as_mut().writer();
+        assert_eq!(no_space_writer.get_mut().remaining_mut(), 0);
 
-        let mut six_buffer = Cursor::new([0; 6]).writer();
-        assert_eq!(six_buffer.get_ref().remaining_mut(), 6);
+        let mut six_buffer = [0; 6];
+        let mut six_buffer_writer = six_buffer.as_mut().writer();
+        assert_eq!(six_buffer_writer.get_mut().remaining_mut(), 6);
 
         // 1 byte
         encode_varint(Varint::Unknown, &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0xFF].as_ref());
-        assert_eq!(encode_varint(Varint::Unknown, &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Unknown, &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         encode_varint(Varint::Value(0), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0x80 | 0].as_ref());
-        assert_eq!(encode_varint(Varint::Value(0), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(0), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         encode_varint(Varint::Value(1), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0x80 | 1].as_ref());
-        assert_eq!(encode_varint(Varint::Value(1), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(1), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         encode_varint(Varint::Value(126), &mut buffer).unwrap();
         assert_eq!(buffer.get_mut().split_to(1), &[0xF0 | 126].as_ref());
-        assert_eq!(encode_varint(Varint::Value(126), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(126), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 2 bytes
         encode_varint(Varint::Value(127), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(2), &[0x40, 127].as_ref());
-        assert_eq!(encode_varint(Varint::Value(127), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(127), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         encode_varint(Varint::Value(128), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(2), &[0x40, 128].as_ref());
-        assert_eq!(encode_varint(Varint::Value(128), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(128), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 6 bytes
-        assert_eq!(six_buffer.get_ref().remaining_mut(), 6);
-        encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut six_buffer).unwrap();
-        assert_eq!(six_buffer.get_ref().remaining_mut(), 0);
-        assert_eq!(&six_buffer.get_ref().get_ref(), &[0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
-        six_buffer = Cursor::new([0; 6]).writer();
+        assert_eq!(six_buffer_writer.get_mut().remaining_mut(), 6);
+        encode_varint(Varint::Value(0x03FFFFFFFFFE), &mut six_buffer_writer).unwrap();
+        assert_eq!(six_buffer_writer.get_mut().remaining_mut(), 0);
+        assert_eq!(&six_buffer, &[0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
+
+        let mut six_buffer = [0; 6];
+        let mut six_buffer_writer = six_buffer.as_mut().writer();
 
         // 7 bytes
         encode_varint(Varint::Value(0x03FFFFFFFFFF), &mut buffer).unwrap();
@@ -347,8 +351,8 @@ mod tests {
         encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut buffer).unwrap();
         assert_eq!(&buffer.get_mut().split_to(7), &[0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE].as_ref());
 
-        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut no_space).unwrap_err().kind(), ErrorKind::WriteZero);
-        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut six_buffer).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut no_space_writer).unwrap_err().kind(), ErrorKind::WriteZero);
+        assert_eq!(encode_varint(Varint::Value(0x01FFFFFFFFFFFE), &mut six_buffer_writer).unwrap_err().kind(), ErrorKind::WriteZero);
 
         // 8 bytes
         encode_varint(Varint::Value(0x01FFFFFFFFFFFF), &mut buffer).unwrap();
