@@ -61,8 +61,38 @@ pub enum Chunk {
     ClusterHead(ClusterHead),
     ClusterBody {
         bytes: Bytes
+    },
+    Empty
+}
+
+pub struct Iter(Chunk);
+
+impl Iterator for Chunk {
+    type Item = Bytes;
+
+    fn next(&mut self) -> Option<Bytes> {
+        match self {
+            Chunk::Headers {ref mut bytes, ..} => {
+                let bytes = mem::replace(bytes, Bytes::new());
+                *self = Chunk::Empty;
+                Some(bytes)
+            },
+            Chunk::ClusterHead(ClusterHead {bytes, ..}) => {
+                let bytes = mem::replace(bytes, BytesMut::new());
+                *self = Chunk::Empty;
+                Some(bytes.freeze())
+            },
+            Chunk::ClusterBody {bytes, ..} => {
+                let bytes = mem::replace(bytes, Bytes::new());
+                *self = Chunk::Empty;
+                Some(bytes)
+            },
+            Chunk::Empty => None
+        }
     }
 }
+
+// impl Buf???
 
 impl Chunk {
     /// converts this chunk of data into a Bytes object, perhaps to send over the network
@@ -70,7 +100,8 @@ impl Chunk {
         match self {
             Chunk::Headers {bytes, ..} => bytes,
             Chunk::ClusterHead(cluster_head) => cluster_head.bytes.freeze(),
-            Chunk::ClusterBody {bytes, ..} => bytes
+            Chunk::ClusterBody {bytes, ..} => bytes,
+            Chunk::Empty => Bytes::new(),
         }
     }
 }
