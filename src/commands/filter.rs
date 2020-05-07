@@ -43,7 +43,9 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         chunk_stream = Box::new(Throttle::new(chunk_stream));
     }
 
-    Runtime::new().unwrap().block_on(chunk_stream.try_for_each(|chunk| {
-        ready(io::stdout().write_all(chunk.as_ref()).map_err(WebmetroError::from))
+    Runtime::new().unwrap().block_on(chunk_stream.try_for_each(|mut chunk| {
+        ready(chunk.try_for_each(|buffer|
+            io::stdout().write_all(&buffer).map_err(WebmetroError::from)
+        ))
     }))
 }
