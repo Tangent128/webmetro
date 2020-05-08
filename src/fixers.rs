@@ -3,12 +3,13 @@ use std::task::{
     Context,
     Poll
 };
-use std::time::{Duration, Instant};
 
-use futures3::prelude::*;
-use tokio2::timer::{
-    delay,
-    Delay
+use futures::prelude::*;
+use tokio::time::{
+    delay_until,
+    Delay,
+    Duration,
+    Instant,
 };
 
 use crate::chunk::Chunk;
@@ -105,7 +106,7 @@ impl<S> Throttle<S> {
         Throttle {
             stream: wrap,
             start_time: now,
-            sleep: delay(now)
+            sleep: delay_until(now)
         }
     }
 }

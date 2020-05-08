@@ -1,8 +1,7 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
-use futures3::prelude::*;
-use hyper13::{client::HttpConnector, Body, Client, Request};
+use futures::prelude::*;
+use hyper::{client::HttpConnector, Body, Client, Request};
 use std::io::{stdout, Write};
-use tokio2::runtime::Runtime;
 
 use super::stdin_stream;
 use webmetro::{
@@ -30,7 +29,8 @@ type BoxedChunkStream = Box<
         + Unpin,
 >;
 
-pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+#[tokio::main]
+pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
@@ -60,12 +60,10 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let request = Request::put(url_str).body(request_payload)?;
     let client = Client::builder().build(HttpConnector::new());
 
-    Runtime::new().unwrap().block_on(async {
-        let response = client.request(request).await?;
-        let mut response_stream = response.into_body();
-        while let Some(response_chunk) = response_stream.next().await.transpose()? {
-            stdout().write_all(&response_chunk)?;
-        }
-        Ok(())
-    })
+    let response = client.request(request).await?;
+    let mut response_stream = response.into_body();
+    while let Some(response_chunk) = response_stream.next().await.transpose()? {
+        stdout().write_all(&response_chunk)?;
+    }
+    Ok(())
 }

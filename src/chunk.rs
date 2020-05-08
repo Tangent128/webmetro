@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes, BytesMut};
-use futures3::prelude::*;
+use futures::prelude::*;
 use std::{
     io::Cursor,
     mem,

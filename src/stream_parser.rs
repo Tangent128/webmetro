@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures3::stream::{Stream, StreamExt, TryStream};
+use futures::stream::{Stream, StreamExt, TryStream};
 use std::task::{Context, Poll};
 
 use crate::ebml::FromEbml;
@@ -112,7 +112,7 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingPa
 
 #[cfg(test)]
 mod tests {
-    use futures3::{future::poll_fn, stream::StreamExt, FutureExt};
+    use futures::{future::poll_fn, stream::StreamExt, FutureExt};
     use matches::assert_matches;
     use std::task::Poll::*;
 
@@ -129,7 +129,7 @@ mod tests {
                 &ENCODE_WEBM_TEST_FILE[40..],
             ];
 
-            let mut stream_parser = futures3::stream::iter(pieces.iter())
+            let mut stream_parser = futures::stream::iter(pieces.iter())
                 .map(|bytes| Ok(&bytes[..]))
                 .parse_ebml();
 
@@ -181,7 +181,7 @@ mod tests {
         ];
 
         async {
-            let mut parser = futures3::stream::iter(pieces.iter())
+            let mut parser = futures::stream::iter(pieces.iter())
                 .map(|bytes| Ok(&bytes[..]))
                 .parse_ebml();
 

@@ -4,9 +4,7 @@ use std::{
 };
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use futures3::prelude::*;
-use futures3::future::ready;
-use tokio2::runtime::Runtime;
+use futures::prelude::*;
 
 use super::stdin_stream;
 use webmetro::{
@@ -30,7 +28,8 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down output to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+#[tokio::main]
+pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
     let mut chunk_stream: Box<dyn TryStream<Item = Result<Chunk, WebmetroError>, Ok = Chunk, Error = WebmetroError> + Send + Unpin> = Box::new(
         stdin_stream()
@@ -43,9 +42,10 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         chunk_stream = Box::new(Throttle::new(chunk_stream));
     }
 
-    Runtime::new().unwrap().block_on(chunk_stream.try_for_each(|mut chunk| {
-        ready(chunk.try_for_each(|buffer|
-            io::stdout().write_all(&buffer).map_err(WebmetroError::from)
-        ))
-    }))
+    while let Some(chunk) = chunk_stream.next().await {
+        chunk?.try_for_each(|buffer|
+            io::stdout().write_all(&buffer)
+        )?;
+    };
+    Ok(())
 }
