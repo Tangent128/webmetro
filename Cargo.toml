@@ -15,7 +15,7 @@ http = "^0.2"
 hyper = "^0.13"
 log = "^0.4.8"
 matches = "^0.1.8"
-odds = { version = "0.3.1", features = ["std-vec"] }
+odds = { version = "^0.4", features = ["std-vec"] }
 tokio = { version="^0.2", features = ["io-std", "tcp", "macros", "rt-threaded", "time"] }
 tokio-codec = "0.1.1"
 tokio-io = "0.1.12"
