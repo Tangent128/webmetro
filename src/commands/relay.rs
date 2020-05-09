@@ -8,19 +8,10 @@ use std::sync::{
 use bytes::{Bytes, Buf};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
-    Future,
-    Stream,
-    Sink,
-    stream::empty
-};
-use futures3::{
-    compat::{
-        Compat,
-        CompatSink,
-        Compat01As03,
-    },
-    Never,
+    never::Never,
     prelude::*,
+    Stream,
+    stream::FuturesUnordered,
 };
 use hyper::{
     Body,
@@ -56,30 +47,29 @@ use webmetro::{
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
-fn get_stream(channel: Handle) -> impl Stream<Item = Bytes, Error = WebmetroError> {
+fn get_stream(channel: Handle) -> impl Stream<Item = Result<Bytes, WebmetroError>> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
-    Compat::new(Listener::new(channel).map(|c| Ok(c))
+    Listener::new(channel).map(|c| Ok(c))
     .map_ok(move |chunk| timecode_fixer.process(chunk))
     .find_starting_point()
     .map_ok(|webm_chunk| webm_chunk.into_bytes())
-    .map_err(|err: Never| match err {}))
+    .map_err(|err: Never| match err {})
 }
 
-fn post_stream(channel: Handle, stream: impl Stream<Item = impl Buf, Error = warp::Error>) -> impl Stream<Item = Bytes, Error = WebmetroError> {
-    let source = Compat01As03::new(stream
-        .map_err(WebmetroError::from))
+fn post_stream(channel: Handle, stream: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin) -> impl Stream<Item = Result<Bytes, WebmetroError>> {
+    let source = stream
+        .map_err(WebmetroError::from)
         .parse_ebml().with_soft_limit(BUFFER_LIMIT)
         .chunk_webm().with_soft_limit(BUFFER_LIMIT);
-    let sink = CompatSink::new(Transmitter::new(channel));
+    let sink = Transmitter::new(channel);
 
-    Compat::new(source).forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
+    source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
     .into_stream()
-    .map(|_| empty())
+    .map_ok(|_| Bytes::new())
     .map_err(|err| {
         warn!("{}", err);
         err
     })
-    .flatten()
 }
 
 fn media_response(body: Body) -> Response<Body> {
@@ -99,7 +89,8 @@ pub fn options() -> App<'static, 'static> {
             .required(true))
 }
 
-pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+#[tokio::main]
+pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let channel_map = Arc::new(Mutex::new(WeakValueHashMap::<String, Weak<Mutex<Channel>>>::new()));
     let addr_str = args.value_of("listen").ok_or("Listen address wasn't provided")?;
 
@@ -122,13 +113,13 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
             media_response(Body::empty())
         });
 
-    let get = channel.clone().and(warp::get2())
+    let get = channel.clone().and(warp::get())
         .map(|(channel, name)| {
             info!("Listener Connected On Channel {}", name);
             media_response(Body::wrap_stream(get_stream(channel)))
         });
 
-    let post_put = channel.clone().and(warp::post2().or(warp::put2()).unify())
+    let post_put = channel.clone().and(warp::post().or(warp::put()).unify())
         .and(warp::body::stream()).map(|(channel, name), stream| {
             info!("Source Connected On Channel {}", name);
             Response::new(Body::wrap_stream(post_stream(channel, stream)))
@@ -138,11 +129,9 @@ pub fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         .or(get)
         .or(post_put);
 
-    let mut rt = tokio::runtime::Runtime::new()?;
+    let mut server_futures: FuturesUnordered<_> = addrs.map(|addr| warp::serve(routes.clone()).try_bind(addr)).collect();
 
-    for do_serve in addrs.map(|addr| warp::serve(routes.clone()).try_bind(addr)) {
-        rt.spawn(do_serve);
-    }
+    while let Some(_) = server_futures.next().await {};
 
-    rt.shutdown_on_idle().wait().map_err(|_| "Shutdown error.".into())
+    Ok(())
 }

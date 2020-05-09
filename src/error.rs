@@ -6,7 +6,6 @@ custom_error!{pub WebmetroError
     EbmlError{source: crate::ebml::EbmlError} = "EBML error: {source}",
     HttpError{source: http::Error} = "HTTP error: {source}",
     HyperError{source: hyper::Error} = "Hyper error: {source}",
-    Hyper13Error{source: hyper13::Error} = "Hyper error: {source}",
     IoError{source: std::io::Error} = "IO error: {source}",
     WarpError{source: warp::Error} = "Warp error: {source}",
     ApplicationError{message: String} = "{message}"

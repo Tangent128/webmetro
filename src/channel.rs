@@ -8,7 +8,7 @@ use std::sync::{
     Mutex
 };
 
-use futures3::{
+use futures::{
     channel::mpsc::{
         channel as mpsc_channel,
         Sender,
@@ -16,7 +16,7 @@ use futures3::{
     },
     Sink,
     Stream,
-    Never
+    never::Never,
 };
 use odds::vec::VecExt;
 

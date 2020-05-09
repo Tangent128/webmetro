@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes, BytesMut};
-use futures3::prelude::*;
+use futures::prelude::*;
 use std::{
     io::Cursor,
     mem,
@@ -141,7 +141,9 @@ fn encode(element: WebmElement, buffer: &mut Cursor<Vec<u8>>, limit: Option<usiz
     encode_webm_element(element, buffer).map_err(|err| err.into())
 }
 
-impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> Stream for WebmChunker<S>
+impl<I: Buf, E, S: Stream<Item = Result<I, E>> + Unpin> Stream for WebmChunker<S>
+where
+    WebmetroError: From<E>,
 {
     type Item = Result<Chunk, WebmetroError>;
 

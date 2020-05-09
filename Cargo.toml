@@ -5,21 +5,18 @@ authors = ["Tangent 128 <Tangent128@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-bytes = "^0.4.12"
-clap = "^2.33.0"
+byteorder = "1"
+bytes = "^0.5"
+clap = "^2.33"
 custom_error = "^1.7"
 env_logger = "^0.7"
-futures = "0.1.29"
-futures3 = { package = "futures-preview", version="0.3.0-alpha", features = ["compat"] }
-http = "^0.1.18"
-hyper = "^0.12.35"
-hyper13 = { package = "hyper", version="0.13.0-alpha.4", features = ["unstable-stream"] }
+futures = "^0.3"
+http = "^0.2"
+hyper = "^0.13"
 log = "^0.4.8"
-matches = "^0.1.8"
-odds = { version = "0.3.1", features = ["std-vec"] }
-tokio = "0.1.22"
-tokio2 = { package = "tokio", version="0.2.0-alpha.6" }
-tokio-codec = "0.1.1"
-tokio-io = "0.1.12"
-warp = "0.1.20"
+matches = "^0.1"
+odds = { version = "^0.4", features = ["std-vec"] }
+tokio = { version="^0.2", features = ["io-std", "tcp", "macros", "rt-threaded", "time"] }
+tokio-util = "^0.3"
+warp = "^0.2"
 weak-table = "^0.2.3"

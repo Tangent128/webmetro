@@ -3,16 +3,16 @@ use std::task::{
     Context,
     Poll
 };
-use std::time::{Duration, Instant};
 
-use futures3::prelude::*;
-use tokio2::timer::{
-    delay,
-    Delay
+use futures::prelude::*;
+use tokio::time::{
+    delay_until,
+    Delay,
+    Duration,
+    Instant,
 };
 
 use crate::chunk::Chunk;
-use crate::error::WebmetroError;
 
 pub struct ChunkTimecodeFixer {
     current_offset: u64,
@@ -28,7 +28,7 @@ impl ChunkTimecodeFixer {
             assumed_duration: 33
         }
     }
-    pub fn process<'a>(&mut self, mut chunk: Chunk) -> Chunk {
+    pub fn process(&mut self, mut chunk: Chunk) -> Chunk {
         match chunk {
             Chunk::ClusterHead(ref mut cluster_head) => {
                 let start = cluster_head.start;
@@ -105,16 +105,16 @@ impl<S> Throttle<S> {
         Throttle {
             stream: wrap,
             start_time: now,
-            sleep: delay(now)
+            sleep: delay_until(now)
         }
     }
 }
 
-impl<S: TryStream<Ok = Chunk, Error = WebmetroError> + Unpin> Stream for Throttle<S>
+impl<S: TryStream<Ok = Chunk> + Unpin> Stream for Throttle<S>
 {
-    type Item = Result<Chunk, WebmetroError>;
+    type Item = Result<Chunk, S::Error>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, WebmetroError>>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, S::Error>>> {
         match self.sleep.poll_unpin(cx) {
             Poll::Pending => return Poll::Pending,
             Poll::Ready(()) => { /* can continue */ },

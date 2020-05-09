@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures3::stream::{Stream, StreamExt, TryStream};
+use futures::stream::{Stream, StreamExt};
 use std::task::{Context, Poll};
 
 use crate::ebml::FromEbml;
@@ -22,11 +22,7 @@ impl<S> EbmlStreamingParser<S> {
     }
 }
 
-pub trait StreamEbml: Sized + TryStream + Unpin
-where
-    Self: Sized + TryStream + Unpin,
-    Self::Ok: Buf,
-{
+pub trait StreamEbml: Sized {
     fn parse_ebml(self) -> EbmlStreamingParser<Self> {
         EbmlStreamingParser {
             stream: self,
@@ -37,9 +33,13 @@ where
     }
 }
 
-impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> StreamEbml for S {}
+impl<I: Buf, E, S: Stream<Item = Result<I, E>> + Unpin> StreamEbml for S where WebmetroError: From<E>
+{}
 
-impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingParser<S> {
+impl<I: Buf, E, S: Stream<Item = Result<I, E>> + Unpin> EbmlStreamingParser<S>
+where
+    WebmetroError: From<E>,
+{
     pub fn poll_event<'a, T: FromEbml<'a>>(
         &'a mut self,
         cx: &mut Context,
@@ -53,10 +53,9 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingPa
                     let mut bytes = self.buffer.split_to(info.element_len).freeze();
                     bytes.advance(info.body_offset);
                     self.borrowed = bytes;
-                    return Poll::Ready(Some(T::decode(
-                        info.element_id,
-                        &self.borrowed,
-                    ).map_err(Into::into)));
+                    return Poll::Ready(Some(
+                        T::decode(info.element_id, &self.borrowed).map_err(Into::into),
+                    ));
                 }
             }
 
@@ -77,9 +76,7 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingPa
             }
         }
     }
-}
 
-impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingParser<S> {
     pub async fn next<'a, T: FromEbml<'a>>(&'a mut self) -> Result<Option<T>, WebmetroError> {
         loop {
             if let Some(info) = T::check_space(&self.buffer)? {
@@ -112,8 +109,7 @@ impl<I: Buf, S: Stream<Item = Result<I, WebmetroError>> + Unpin> EbmlStreamingPa
 
 #[cfg(test)]
 mod tests {
-    use bytes::IntoBuf;
-    use futures3::{future::poll_fn, stream::StreamExt, FutureExt};
+    use futures::{future::poll_fn, stream::StreamExt, FutureExt};
     use matches::assert_matches;
     use std::task::Poll::*;
 
@@ -130,8 +126,8 @@ mod tests {
                 &ENCODE_WEBM_TEST_FILE[40..],
             ];
 
-            let mut stream_parser = futures3::stream::iter(pieces.iter())
-                .map(|bytes| Ok(bytes.into_buf()))
+            let mut stream_parser = futures::stream::iter(pieces.iter())
+                .map(|bytes| Ok::<&[u8], WebmetroError>(&bytes[..]))
                 .parse_ebml();
 
             assert_matches!(
@@ -182,8 +178,8 @@ mod tests {
         ];
 
         async {
-            let mut parser = futures3::stream::iter(pieces.iter())
-                .map(|bytes| Ok(bytes.into_buf()))
+            let mut parser = futures::stream::iter(pieces.iter())
+                .map(|bytes| Ok::<&[u8], WebmetroError>(&bytes[..]))
                 .parse_ebml();
 
             assert_matches!(parser.next().await?, Some(WebmElement::EbmlHead));
@@ -197,8 +193,8 @@ mod tests {
 
             Result::<(), WebmetroError>::Ok(())
         }
-        .now_or_never()
-        .expect("Test tried to block on I/O")
-        .expect("Parse failed");
+            .now_or_never()
+            .expect("Test tried to block on I/O")
+            .expect("Parse failed");
     }
 }
