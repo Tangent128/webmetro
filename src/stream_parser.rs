@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures::stream::{Stream, StreamExt};
+use futures::{TryStreamExt, stream::{Stream, StreamExt}};
 use std::task::{Context, Poll};
 
 use crate::ebml::FromEbml;
@@ -93,7 +93,7 @@ where
                 }
             }
 
-            match self.stream.next().await.transpose()? {
+            match self.stream.try_next().await? {
                 Some(refill) => {
                     self.buffer.reserve(refill.remaining());
                     self.buffer.put(refill);

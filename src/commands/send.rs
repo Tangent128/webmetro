@@ -57,7 +57,7 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
 
     let response = client.request(request).await?;
     let mut response_stream = response.into_body();
-    while let Some(response_chunk) = response_stream.next().await.transpose()? {
+    while let Some(response_chunk) = response_stream.try_next().await? {
         stdout().write_all(&response_chunk)?;
     }
     Ok(())
