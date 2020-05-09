@@ -8,7 +8,6 @@ use std::sync::{
 use bytes::{Bytes, Buf};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::{
-    never::Never,
     prelude::*,
     Stream,
     stream::FuturesUnordered,
@@ -53,23 +52,21 @@ fn get_stream(channel: Handle) -> impl Stream<Item = Result<Bytes, WebmetroError
     .map_ok(move |chunk| timecode_fixer.process(chunk))
     .find_starting_point()
     .map_ok(|webm_chunk| webm_chunk.into_bytes())
-    .map_err(|err: Never| match err {})
 }
 
 fn post_stream(channel: Handle, stream: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin) -> impl Stream<Item = Result<Bytes, WebmetroError>> {
-    let source = stream
+    let channel = Transmitter::new(channel);
+    stream
         .map_err(WebmetroError::from)
         .parse_ebml().with_soft_limit(BUFFER_LIMIT)
-        .chunk_webm().with_soft_limit(BUFFER_LIMIT);
-    let sink = Transmitter::new(channel);
-
-    source.forward(sink.sink_map_err(|err| -> WebmetroError {match err {}}))
-    .into_stream()
-    .map_ok(|_| Bytes::new())
-    .map_err(|err| {
-        warn!("{}", err);
-        err
-    })
+        .chunk_webm().with_soft_limit(BUFFER_LIMIT)
+        .map_ok(move |chunk| {
+            channel.send(chunk);
+            Bytes::new()
+        })
+        .inspect_err(|err| {
+            warn!("{}", err)
+        })
 }
 
 fn media_response(body: Body) -> Response<Body> {
