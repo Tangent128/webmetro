@@ -22,12 +22,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Slow down upload to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
 }
 
-type BoxedChunkStream = Box<
-    dyn TryStream<Item = Result<Chunk, WebmetroError>, Ok = Chunk, Error = WebmetroError>
-        + Send
-        + Sync
-        + Unpin,
->;
+type BoxedChunkStream = Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send + Sync + Unpin>;
 
 #[tokio::main]
 pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
