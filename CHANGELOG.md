@@ -1,3 +1,6 @@
+## v0.3.1-dev
+- forget a channel's initialization segment when no transmitter is active. This improves behavior when a channel is occasionally used for streams with different codecs.
+
 ## v0.3.0
 - update internals to v0.2 of `warp` and `tokio`; no remaining code relies on `futures` 0.1
 

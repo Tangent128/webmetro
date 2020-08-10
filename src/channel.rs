@@ -57,6 +57,16 @@ impl Transmitter {
     }
 }
 
+impl Drop for Transmitter {
+    fn drop(&mut self) {
+        if let Ok(mut channel) = self.channel.lock() {
+            // when disconnecting, clean up the header chunk so subsequent
+            // clients don't get a potentially incorrect initialization segment
+            channel.header_chunk = None;
+        }
+    }
+}
+
 pub struct Listener {
     /// not used in operation, but its refcount keeps the channel alive when there's no Transmitter
     _channel: Handle,
