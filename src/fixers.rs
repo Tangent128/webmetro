@@ -95,7 +95,7 @@ impl<S: TryStream<Ok = Chunk> + Unpin> Stream for StartingPointFinder<S>
 
 pub struct Throttle<S> {
     stream: S,
-    start_time: Instant,
+    start_time: Option<Instant>,
     sleep: Delay
 }
 
@@ -104,7 +104,7 @@ impl<S> Throttle<S> {
         let now = Instant::now();
         Throttle {
             stream: wrap,
-            start_time: now,
+            start_time: None,
             sleep: delay_until(now)
         }
     }
@@ -122,9 +122,11 @@ impl<S: TryStream<Ok = Chunk> + Unpin> Stream for Throttle<S>
 
         let next_chunk = self.stream.try_poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(Chunk::ClusterHead(ref cluster_head)))) = next_chunk {
+            // we have actual data, so start the clock if we haven't yet
+            let start_time = self.start_time.get_or_insert_with(Instant::now);
             // snooze until real time has "caught up" to the stream
             let offset = Duration::from_millis(cluster_head.end);
-            let sleep_until = self.start_time + offset;
+            let sleep_until = *start_time + offset;
             self.sleep.reset(sleep_until);
         }
         next_chunk

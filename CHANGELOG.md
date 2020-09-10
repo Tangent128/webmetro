@@ -1,6 +1,7 @@
 ## v0.3.1-dev
 - forget a channel's initialization segment when no transmitter is active. This improves behavior when a channel is occasionally used for streams with different codecs.
 - Add INFO logging for channel creation/garbage-collection
+- Start throttle timing on first data instead of throttle creation (improves cases where the source is slow to start)
 
 ## v0.3.0
 - update internals to v0.2 of `warp` and `tokio`; no remaining code relies on `futures` 0.1
