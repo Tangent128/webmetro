@@ -25,11 +25,18 @@ pub type Handle = Arc<Mutex<Channel>>;
 
 impl Channel {
     pub fn new(name: String) -> Handle {
+        info!("Opening Channel {}", name);
         Arc::new(Mutex::new(Channel {
             name,
             header_chunk: None,
             listeners: Vec::new(),
         }))
+    }
+}
+
+impl Drop for Channel {
+    fn drop(&mut self) {
+        info!("Closing Channel {}", self.name);
     }
 }
 
