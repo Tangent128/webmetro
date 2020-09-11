@@ -92,20 +92,6 @@ impl Iterator for Chunk {
     }
 }
 
-// impl Buf???
-
-impl Chunk {
-    /// converts this chunk of data into a Bytes object, perhaps to send over the network
-    pub fn into_bytes(self) -> Bytes {
-        match self {
-            Chunk::Headers {bytes, ..} => bytes,
-            Chunk::ClusterHead(cluster_head) => cluster_head.bytes.freeze(),
-            Chunk::ClusterBody {bytes, ..} => bytes,
-            Chunk::Empty => Bytes::new(),
-        }
-    }
-}
-
 #[derive(Debug)]
 enum ChunkerState {
     BuildingHeader(Cursor<Vec<u8>>),

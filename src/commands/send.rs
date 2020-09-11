@@ -1,7 +1,9 @@
+use bytes::Bytes;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
 use hyper::{client::HttpConnector, Body, Client, Request};
 use std::io::{stdout, Write};
+use stream::iter;
 
 use super::stdin_stream;
 use webmetro::{
@@ -26,6 +28,7 @@ type BoxedChunkStream = Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Se
 
 #[tokio::main]
 pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+    // build pipeline
     let mut timecode_fixer = ChunkTimecodeFixer::new();
     let mut chunk_stream: BoxedChunkStream = Box::new(
         stdin_stream()
@@ -44,7 +47,8 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     }
 
     let chunk_stream = chunk_stream
-        .map_ok(|webm_chunk| webm_chunk.into_bytes())
+        .map_ok(|webm_chunk| iter(webm_chunk).map(Result::<Bytes, WebmetroError>::Ok))
+        .try_flatten()
         .map_err(|err| {
             warn!("{}", &err);
             err

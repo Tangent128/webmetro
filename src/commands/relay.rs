@@ -20,6 +20,7 @@ use hyper::{
         CONTENT_TYPE
     }
 };
+use stream::iter;
 use warp::{
     self,
     Filter,
@@ -42,16 +43,17 @@ use webmetro::{
         ChunkTimecodeFixer,
     },
     stream_parser::StreamEbml
-};
+, chunk::Chunk};
 
 const BUFFER_LIMIT: usize = 2 * 1024 * 1024;
 
 fn get_stream(channel: Handle) -> impl Stream<Item = Result<Bytes, WebmetroError>> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
-    Listener::new(channel).map(|c| Ok(c))
+    Listener::new(channel).map(|c| Result::<Chunk, WebmetroError>::Ok(c))
     .map_ok(move |chunk| timecode_fixer.process(chunk))
     .find_starting_point()
-    .map_ok(|webm_chunk| webm_chunk.into_bytes())
+    .map_ok(|webm_chunk| iter(webm_chunk).map(Result::<Bytes, WebmetroError>::Ok))
+    .try_flatten()
 }
 
 fn post_stream(channel: Handle, stream: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin) -> impl Stream<Item = Result<Bytes, WebmetroError>> {
