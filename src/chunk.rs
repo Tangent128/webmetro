@@ -58,15 +58,16 @@ pub enum Chunk {
     Headers {
         bytes: Bytes
     },
-    ClusterHead(ClusterHead),
-    ClusterBody {
-        bytes: Bytes
-    },
+    Cluster(ClusterHead, Bytes),
+    // for iteration only
+    #[doc(hidden)]
+    RemainingBody(Bytes),
+    // for iteration only
+    #[doc(hidden)]
     Empty
 }
 
-pub struct Iter(Chunk);
-
+// TODO: make an external iterator type so we can remove Chunk::RemainingBody & Chunk::Empty
 impl Iterator for Chunk {
     type Item = Bytes;
 
@@ -77,12 +78,13 @@ impl Iterator for Chunk {
                 *self = Chunk::Empty;
                 Some(bytes)
             },
-            Chunk::ClusterHead(ClusterHead {bytes, ..}) => {
+            Chunk::Cluster(ClusterHead {bytes, ..}, body) => {
                 let bytes = mem::replace(bytes, BytesMut::new());
-                *self = Chunk::Empty;
+                let body = mem::replace(body, Bytes::new());
+                *self = Chunk::RemainingBody(body);
                 Some(bytes.freeze())
             },
-            Chunk::ClusterBody {bytes, ..} => {
+            Chunk::RemainingBody(bytes) => {
                 let bytes = mem::replace(bytes, Bytes::new());
                 *self = Chunk::Empty;
                 Some(bytes)
@@ -104,7 +106,6 @@ pub struct WebmChunker<S> {
     source: EbmlStreamingParser<S>,
     buffer_size_limit: Option<usize>,
     state: ChunkerState,
-    pending_chunk: Option<Chunk>,
 }
 
 impl<S> WebmChunker<S> {
@@ -135,9 +136,6 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, WebmetroError>>> {
         let mut chunker = self.get_mut();
-        if chunker.pending_chunk.is_some() {
-            return Ready(chunker.pending_chunk.take().map(Ok));
-        }
         loop {
             match chunker.state {
                 ChunkerState::BuildingHeader(ref mut buffer) => {
@@ -180,9 +178,8 @@ where
                                 let mut new_header_cursor = Cursor::new(Vec::new());
                                 match encode(element, &mut new_header_cursor, chunker.buffer_size_limit) {
                                     Ok(_) => {
-                                        chunker.pending_chunk = Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer.into_inner())});
                                         chunker.state = ChunkerState::BuildingHeader(new_header_cursor);
-                                        return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
+                                        return Ready(Some(Ok(Chunk::Cluster(liberated_cluster_head, Bytes::from(liberated_buffer.into_inner())))));
                                     },
                                     Err(err) => {
                                         chunker.state = ChunkerState::End;
@@ -194,8 +191,7 @@ where
                                 let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                                 let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
-                                chunker.pending_chunk = Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer.into_inner())});
-                                return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
+                                return Ready(Some(Ok(Chunk::Cluster(liberated_cluster_head, Bytes::from(liberated_buffer.into_inner())))));
                             },
                             WebmElement::Timecode(timecode) => {
                                 cluster_head.update_timecode(timecode);
@@ -226,9 +222,8 @@ where
                             let liberated_cluster_head = mem::replace(cluster_head, ClusterHead::new(0));
                             let liberated_buffer = mem::replace(buffer, Cursor::new(Vec::new()));
 
-                            chunker.pending_chunk = Some(Chunk::ClusterBody {bytes: Bytes::from(liberated_buffer.into_inner())});
                             chunker.state = ChunkerState::End;
-                            return Ready(Some(Ok(Chunk::ClusterHead(liberated_cluster_head))));
+                            return Ready(Some(Ok(Chunk::Cluster(liberated_cluster_head, Bytes::from(liberated_buffer.into_inner())))));
                         }
                     }
                 },
@@ -249,8 +244,7 @@ impl<S: Stream> WebmStream for EbmlStreamingParser<S> {
         WebmChunker {
             source: self,
             buffer_size_limit: None,
-            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new())),
-            pending_chunk: None
+            state: ChunkerState::BuildingHeader(Cursor::new(Vec::new()))
         }
     }
 }

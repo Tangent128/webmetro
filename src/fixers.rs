@@ -30,7 +30,7 @@ impl ChunkTimecodeFixer {
     }
     pub fn process(&mut self, mut chunk: Chunk) -> Chunk {
         match chunk {
-            Chunk::ClusterHead(ref mut cluster_head) => {
+            Chunk::Cluster(ref mut cluster_head, _) => {
                 let start = cluster_head.start;
                 if start < self.last_observed_timecode {
                     let next_timecode = self.last_observed_timecode + self.assumed_duration;
@@ -59,20 +59,13 @@ impl<S: TryStream<Ok = Chunk> + Unpin> Stream for StartingPointFinder<S>
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Result<Chunk, S::Error>>> {
         loop {
             return match self.stream.try_poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(Chunk::ClusterHead(cluster_head)))) => {
+                Poll::Ready(Some(Ok(Chunk::Cluster(cluster_head, cluster_body)))) => {
                     if cluster_head.keyframe {
                         self.seen_keyframe = true;
                     }
 
                     if self.seen_keyframe {
-                        Poll::Ready(Some(Ok(Chunk::ClusterHead(cluster_head))))
-                    } else {
-                        continue;
-                    }
-                },
-                chunk @ Poll::Ready(Some(Ok(Chunk::ClusterBody {..}))) => {
-                    if self.seen_keyframe {
-                        chunk
+                        Poll::Ready(Some(Ok(Chunk::Cluster(cluster_head, cluster_body))))
                     } else {
                         continue;
                     }
@@ -121,7 +114,7 @@ impl<S: TryStream<Ok = Chunk> + Unpin> Stream for Throttle<S>
         }
 
         let next_chunk = self.stream.try_poll_next_unpin(cx);
-        if let Poll::Ready(Some(Ok(Chunk::ClusterHead(ref cluster_head)))) = next_chunk {
+        if let Poll::Ready(Some(Ok(Chunk::Cluster(ref cluster_head, _)))) = next_chunk {
             // we have actual data, so start the clock if we haven't yet
             let start_time = self.start_time.get_or_insert_with(Instant::now);
             // snooze until real time has "caught up" to the stream
