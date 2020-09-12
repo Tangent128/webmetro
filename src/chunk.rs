@@ -67,6 +67,15 @@ pub enum Chunk {
     Empty
 }
 
+impl Chunk {
+    pub fn overlaps(&self, start: u128, stop: u128) -> bool {
+        match self {
+            Chunk::Cluster(head, _) => head.start as u128 <= stop && head.end as u128 >= start,
+            _ => true,
+        }
+    }
+}
+
 // TODO: make an external iterator type so we can remove Chunk::RemainingBody & Chunk::Empty
 impl Iterator for Chunk {
     type Item = Bytes;
