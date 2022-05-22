@@ -1,4 +1,4 @@
-use std::{io, io::prelude::*};
+use std::{io, io::prelude::*, pin::Pin};
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
@@ -22,8 +22,8 @@ pub fn options() -> App<'static, 'static> {
 #[tokio::main]
 pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
-    let mut chunk_stream: Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send + Unpin> =
-        Box::new(
+    let mut chunk_stream: Pin<Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send>> =
+        Box::pin(
             stdin_stream()
                 .parse_ebml()
                 .chunk_webm()
@@ -31,7 +31,7 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
         );
 
     if args.is_present("throttle") {
-        chunk_stream = Box::new(Throttle::new(chunk_stream));
+        chunk_stream = Box::pin(Throttle::new(chunk_stream));
     }
 
     while let Some(chunk) = chunk_stream.next().await {

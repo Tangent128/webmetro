@@ -263,7 +263,7 @@ pub trait FromEbml<'a>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{BytesMut, buf::ext::BufMutExt};
+    use bytes::BytesMut;
     use crate::ebml::*;
     use crate::ebml::EbmlError::{CorruptVarint, UnknownElementId};
     use crate::ebml::Varint::{Unknown, Value};

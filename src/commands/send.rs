@@ -2,7 +2,7 @@ use bytes::Bytes;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::prelude::*;
 use hyper::{client::HttpConnector, Body, Client, Request};
-use std::io::{stdout, Write};
+use std::{io::{stdout, Write}, pin::Pin};
 use stream::iter;
 
 use super::{parse_time, stdin_stream};
@@ -34,7 +34,7 @@ pub fn options() -> App<'static, 'static> {
             .help("Stop uploading after approximately n seconds of content"))
 }
 
-type BoxedChunkStream = Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send + Sync + Unpin>;
+type BoxedChunkStream = Pin<Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send + Sync>>;
 
 #[tokio::main]
 pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
@@ -49,7 +49,7 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
 
     // build pipeline
     let mut timecode_fixer = ChunkTimecodeFixer::new();
-    let mut chunk_stream: BoxedChunkStream = Box::new(
+    let mut chunk_stream: BoxedChunkStream = Box::pin(
         stdin_stream()
             .parse_ebml()
             .chunk_webm()
@@ -58,7 +58,7 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
     );
 
     if args.is_present("throttle") {
-        chunk_stream = Box::new(Throttle::new(chunk_stream));
+        chunk_stream = Box::pin(Throttle::new(chunk_stream));
     }
 
     let chunk_stream = chunk_stream
