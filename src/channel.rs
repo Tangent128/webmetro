@@ -6,7 +6,6 @@ use futures::{
     channel::mpsc::{channel as mpsc_channel, Receiver, Sender},
     Stream,
 };
-use odds::vec::VecExt;
 
 use crate::chunk::Chunk;
 
