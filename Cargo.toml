@@ -9,7 +9,7 @@ byteorder = "1"
 bytes = "^0.5"
 clap = "^2.33"
 custom_error = "^1.7"
-env_logger = "^0.7"
+env_logger = "^0.9"
 futures = "^0.3"
 http = "^0.2"
 hyper = "^0.13"
@@ -17,5 +17,7 @@ log = "^0.4.8"
 matches = "^0.1"
 tokio = { version="^0.2", features = ["io-std", "tcp", "macros", "rt-threaded", "time"] }
 tokio-util = "^0.3"
+#tokio = { version="^1.18", features = ["io-std", "macros", "net", "rt", "time"] }
+#tokio-util = { version="^0.6.9", features=["codec"] }
 warp = "^0.2"
-weak-table = "^0.2.3"
+weak-table = "^0.3"
