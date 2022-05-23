@@ -1,4 +1,5 @@
 ## v0.3.1-dev
+- Teach filter subcommand to recognize --skip and --take options
 - MSRV now rustc 1.61
 - forget a channel's initialization segment when no transmitter is active. This improves behavior when a channel is occasionally used for streams with different codecs.
 - Add INFO logging for channel creation/garbage-collection
