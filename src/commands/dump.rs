@@ -1,32 +1,26 @@
-use clap::{App, AppSettings, ArgMatches, SubCommand};
+use clap::Args;
 
 use super::stdin_stream;
 use webmetro::{
     error::WebmetroError,
     stream_parser::StreamEbml,
-    webm::{
-        SimpleBlock,
-        WebmElement::*
-    }
+    webm::{SimpleBlock, WebmElement::*},
 };
 
-pub fn options() -> App<'static, 'static> {
-    SubCommand::with_name("dump")
-        .setting(AppSettings::Hidden)
-        .about("Dumps WebM parsing events from parsing stdin")
-}
+/// Dumps WebM parsing events from parsing stdin
+#[derive(Args, Debug)]
+pub struct DumpArgs;
 
 #[tokio::main]
-pub async fn run(_args: &ArgMatches) -> Result<(), WebmetroError> {
-
+pub async fn run(_args: DumpArgs) -> Result<(), WebmetroError> {
     let mut events = stdin_stream().parse_ebml();
 
     while let Some(element) = events.next().await? {
         match element {
             // suppress printing byte arrays
             Tracks(slice) => println!("Tracks[{}]", slice.len()),
-            SimpleBlock(SimpleBlock {timecode, ..}) => println!("SimpleBlock@{}", timecode),
-            other => println!("{:?}", other)
+            SimpleBlock(SimpleBlock { timecode, .. }) => println!("SimpleBlock@{}", timecode),
+            other => println!("{:?}", other),
         }
     }
     Ok(())

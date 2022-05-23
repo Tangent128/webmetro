@@ -1,6 +1,6 @@
 use std::{io, io::prelude::*, pin::Pin};
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::Args;
 use futures::prelude::*;
 
 use super::stdin_stream;
@@ -11,16 +11,16 @@ use webmetro::{
     stream_parser::StreamEbml,
 };
 
-pub fn options() -> App<'static, 'static> {
-    SubCommand::with_name("filter")
-        .about("Copies WebM from stdin to stdout, applying the same cleanup & stripping the relay server does.")
-        .arg(Arg::with_name("throttle")
-            .long("throttle")
-            .help("Slow down output to \"real time\" speed as determined by the timestamps (useful for streaming static files)"))
+/// Copies WebM from stdin to stdout, applying the same cleanup & stripping the relay server does.
+#[derive(Args, Debug)]
+pub struct FilterArgs {
+    /// Slow down output to "real time" speed as determined by the timestamps (useful for streaming static files)
+    #[clap(long, short)]
+    throttle: bool,
 }
 
 #[tokio::main]
-pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
+pub async fn run(args: FilterArgs) -> Result<(), WebmetroError> {
     let mut timecode_fixer = ChunkTimecodeFixer::new();
     let mut chunk_stream: Pin<Box<dyn Stream<Item = Result<Chunk, WebmetroError>> + Send>> =
         Box::pin(
@@ -30,7 +30,7 @@ pub async fn run(args: &ArgMatches) -> Result<(), WebmetroError> {
                 .map_ok(move |chunk| timecode_fixer.process(chunk)),
         );
 
-    if args.is_present("throttle") {
+    if args.throttle {
         chunk_stream = Box::pin(Throttle::new(chunk_stream));
     }
 
